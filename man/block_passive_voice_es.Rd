@@ -4,7 +4,7 @@
 \alias{block_passive_voice_es}
 \title{Extract passive voice, copular and existential features (Spanish)}
 \usage{
-block_passive_voice_es(tokens, doc_ids, head_lookup, passive_rel_values)
+block_passive_voice_es(tokens, doc_ids, head_lookup, engine)
 }
 \arguments{
 \item{tokens}{Annotated token data frame}
@@ -13,8 +13,7 @@ block_passive_voice_es(tokens, doc_ids, head_lookup, passive_rel_values)
 
 \item{head_lookup}{Head token lookup table}
 
-\item{passive_rel_values}{Dependency relation values for passive aux
-("aux:pass" for udpipe; c("auxpass","aux:pass") for spaCy)}
+\item{engine}{Parser convention: "udpipe" or "spacy"}
 }
 \value{
 Data frame con f_17 a f_20
@@ -24,5 +23,7 @@ Detecta la pasiva perifistica (ser/estar + participo, aux:pass) y la
 pasiva refleja (se + VerbForm=Part/Fin, expl:pass). Excluye haber
 perfect de f_17/f_18. Distingue ser/estar copulativo (f_19) del
 auxiliar de pasiva. Detecta haber impersonal-existencial (f_20).
+Spanish spaCy also permits ser + aux attached to a verbal participle
+and nominal por-agents attached as obj.
 }
 \keyword{internal}

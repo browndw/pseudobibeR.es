@@ -36,7 +36,9 @@ biber(
 \code{spacyr::spacy_parse()}. A data frame with either parser's columns is
 also accepted. Required columns are \code{doc_id}, \code{sentence_id}, \code{token_id},
 \code{token}, \code{lemma}, \code{head_token_id}, \code{dep_rel}, and \code{upos}/\code{xpos} or
-\code{pos}/\code{tag}. Morphology is supplied in \code{feats} or \code{morph}.}
+\code{pos}/\code{tag}. Morphology is supplied in \code{feats} or \code{morph}. With
+\code{spacyr::spacy_parse()}, set \code{dependency = TRUE}, \code{tag = TRUE},
+\code{pos = TRUE}, and \code{additional_attributes = "morph"}.}
 
 \item{measure}{Lexical diversity measure: \code{"MATTR"}, \code{"TTR"}, \code{"CTTR"},
 \code{"MSTTR"}, or \code{"none"}. The latter omits \code{f_43_type_token}.
@@ -61,8 +63,10 @@ Universal Dependencies annotations. Parsing is performed separately.
 \details{
 Feature identifiers match the English and French companion packages,
 but Spanish heuristics are language-specific. Counts depend on the
-accuracy of the parser. UDPipe Spanish-GSD is the integration-test
-reference; other UD parsers should be independently validated.
+accuracy of the parser. Integration tests cover UDPipe Spanish-GSD and
+spaCy \code{es_core_news_sm}, not general cross-parser equivalence. Native spaCy
+root/passive conventions are supported. Tokenization and model errors can
+produce different counts and normalization denominators across parsers.
 Lexical diversity uses lower-case surface tokens, including punctuation,
 before phrase compounding. Mean word length uses UD word tokens.
 Documents retain their order of first appearance.
