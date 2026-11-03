@@ -1,0 +1,58 @@
+---
+title: "Spanish feature extraction and auditing"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Spanish feature extraction and auditing}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+## A common interface
+
+Parsing is separate from feature extraction. The packaged annotations let this
+example run without a model download or a new annotation run. Reading native
+UDPipe annotations requires the suggested `udpipe` package.
+
+```{r}
+library(pseudobibeR.es)
+features <- biber(udpipe_samples, measure = "TTR", normalize = FALSE)
+features[, c("doc_id", "f_01_past_tense", "f_18_by_passives", "n_tokens")]
+audit_features(udpipe_samples, feature = "f_18_by_passives")
+```
+
+## Corpus processing
+
+Give each document a unique identifier when annotating. Pass the entire annotated
+corpus to `biber()`; one output row is returned per document. UDPipe and spaCy
+annotations use the same public interface. Parsing and export remain the
+responsibility of the caller.
+
+## Interpretation
+
+`normalize = TRUE` divides counts by the document's `n_tokens` and multiplies by
+1,000. Function words count in that denominator; punctuation, symbols, spaces,
+and UD multiword-token containers do not. `n_lex_tokens` is a separate descriptive
+total, not the denominator. The two lexical metrics are not normalized.
+
+The usual output has 67 feature columns. `measure = "none"` omits lexical
+diversity. MATTR and MSTTR use TTR for individual documents shorter than 200
+tokens. A document's features do not change when unrelated documents are added.
+
+Ten columns are zero by compatibility convention, not measured absences.
+Language-specific constructions, parser errors, and lexical inventories mean
+that identical column names do not guarantee cross-language equivalence.
+Do not interpret scores against English factor norms as validated Spanish scores.
+
+## Auditing
+
+Use a canonical feature identifier or category letter. Each audit row identifies
+one token or multiword construction; raw document counts can be recovered by
+summing the `count` column within a document and feature.
+
+```{r}
+audit_features(udpipe_samples, category = "A", sample_n = 3, seed = 42)
+```
