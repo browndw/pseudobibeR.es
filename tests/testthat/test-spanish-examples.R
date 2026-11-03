@@ -47,7 +47,7 @@ test_that("UDPipe spanish examples align with expected feature counts", {
   )
 
   # bug_skipped: list of features with an open bug that are excluded from the
-  # comparison loop and reported as "SKIP BUG f_XX" via cli::cli_inform.
+  # comparison loop and reported as "SKIP BUG f_XX" via message().
   # Empty at the close of audit Phase 3 (commits fix(f_06/f_23/f_24/f_47)).
   # Grep-able marker: "BUG f_". If a bug is reopened, add it here.
   bug_skipped <- character(0)
@@ -95,9 +95,9 @@ test_that("UDPipe spanish examples align with expected feature counts", {
   # (Empty list at the close of Phase 3; the block stays as an anchor in case
   # a bug is reopened in the future.)
   bug_seen <- intersect(bug_skipped, sample_examples$feature)
-  if (length(bug_seen) > 0 && requireNamespace("cli", quietly = TRUE)) {
+  if (length(bug_seen) > 0) {
     for (bf in bug_seen) {
-      cli::cli_inform(paste0("SKIP BUG ", bf, " (ver audit/FEATURE_AUDIT.md)"))
+      message(paste0("SKIP BUG ", bf, " (ver audit/FEATURE_AUDIT.md)"))
     }
   }
   sample_examples <- sample_examples |>
@@ -140,7 +140,7 @@ test_that("UDPipe spanish examples align with expected feature counts", {
   info_text <- if (length(problems) == 0) "" else paste(problems, collapse = "\n  ")
   testthat::expect_true(length(problems) == 0, info = info_text)
 
-  if (nrow(ignored_mismatches) > 0 && requireNamespace("cli", quietly = TRUE)) {
+  if (nrow(ignored_mismatches) > 0) {
     ignored_details <- ignored_mismatches |>
       dplyr::transmute(
         detail = paste0(
@@ -150,7 +150,7 @@ test_that("UDPipe spanish examples align with expected feature counts", {
         )
       ) |>
       dplyr::pull("detail")
-    cli::cli_inform(paste(
+    message(paste(
       c("Divergencias UDPipe conocidas (informativas):", ignored_details),
       collapse = "\n  "
     ))
