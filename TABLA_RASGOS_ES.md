@@ -71,8 +71,8 @@ Spanish name. The historical highlighter is archived outside the package.
 
 | Code | Label | Spanish label | Actual rule | Notes / limits |
 |---|---|---|---|---|
-| `f_17_agentless_passives` | Passives without an agent phrase | Pasivas sin complemento agente | Periphrastic passive (`fue redactado`) **+ reflexive passive** with a nominal subject and third-person finite verb or auxiliary (`se publicaron/se han publicado los informes`), without an agent phrase. Explicit `expl:pv`/`expl:impers` are excluded. | ⚠️ A subjectless impersonal (`se entrevistó a los candidatos`, `se recomienda leer`) is excluded. An `nsubj` alone does not establish a patient role: personal reflexive, reciprocal and pronominal verbs can still be false positives when the parser does not distinguish them. |
-| `f_18_by_passives` | Passives with an agent phrase introduced by *por* | Pasivas con complemento agente introducido por *por* | Passive with a same-sentence `por` case marker whose object is attached as `obl`/`obl:*` (or `agent`) to the passive predicate; not a fixed token window. Nominal modifiers and `por` introducing an `advcl` are excluded. | ⚠️ `spanish-gsd` does not emit `obl:agent`; agent (`por el comité`) and cause (`por incumplimiento`) cannot be told apart reliably (both `obl`). Causal false positives remain possible. |
+| `f_17_agentless_passives` | Passives without an agent phrase | Pasivas sin complemento agente | Periphrastic passive (`fue redactado`) **+ reflexive passive** with a nominal subject and third-person finite verb or auxiliary (`se publicaron/se han publicado los informes`), without an agent phrase. SpaCy also permits `ser` + plain `aux` attached to a VERB participle; plain `estar aux` is not sufficient. Explicit `expl:pv`/`expl:impers` are excluded. | ⚠️ A subjectless impersonal (`se entrevistó a los candidatos`, `se recomienda leer`) is excluded. An `nsubj` alone does not establish a patient role: personal reflexive, reciprocal and pronominal verbs can still be false positives when the parser does not distinguish them. |
+| `f_18_by_passives` | Passives with an agent phrase introduced by *por* | Pasivas con complemento agente introducido por *por* | Passive with a same-sentence `por` case marker whose object is attached as `obl`/`obl:*` (or `agent`) to the passive predicate; native spaCy also accepts nominal NOUN/PROPN/PRON `obj` agents. Not a fixed token window. Nominal modifiers and `por` introducing an `advcl` are excluded. | ⚠️ Agent (`por el comité`) and cause (`por incumplimiento`) cannot be told apart reliably: Spanish-GSD uses `obl`, and spaCy can use `obj`. Causal false positives remain possible. |
 
 ## G. Stative forms
 
@@ -151,7 +151,7 @@ word has the intended discourse, degree, or epistemic function.
 | Code | Label | Spanish label | Actual rule | Notes / limits |
 |---|---|---|---|---|
 | `f_55_verb_public` | Speech-act or public communication verbs | Verbos de lengua o de comunicación pública | Communication lemmas (`afirmar`, `señalar`, `sostener`, `decir`…). Fix (review v2): `decir` was added to the dictionary (`dict$f_55_verb_public`), after confirming empirically that it was missing (*"El testigo dijo que todo era cierto."* gave 0). | ⚠️ Disambiguation by mood (`decir`+subj→f_57 / `decir`+cnd→f_55) was not implemented: the model mis-tags polysemous verbs (`sostuvo`→ADJ). |
-| `f_56_verb_private` | Verbs of thinking | Verbos de pensamiento | `creer`, `pensar`, `saber`, `suponer`… Also `dar` with an attached `Reflex=Yes` pronoun and nominal `cuenta` object (`se dio cuenta`), anchored on the verb. Excludes individual `ver` occurrences recognized as f_58. | ⚠️ `esperar` always counts ('wait' is not separated from 'expect'). Lexical classes are not general sense disambiguation. Pronominal constructions require reflexive morphology/dependencies. |
+| `f_56_verb_private` | Verbs of thinking | Verbos de pensamiento | `creer`, `pensar`, `saber`, `suponer`… Also `dar` with an attached `Reflex=Yes` pronoun and nominal `cuenta` child (`obj/compound`, including subtypes), anchored on the verb. Excludes individual `ver` occurrences recognized as f_58. | ⚠️ `esperar` always counts ('wait' is not separated from 'expect'). Lexical classes are not general sense disambiguation. Pronominal constructions require reflexive morphology/dependencies. spaCy lemmas containing an enclitic (`verlo` → `ver él`) do not match bare verb inventories automatically. |
 | `f_57_verb_suasive` | Suasive verbs | Verbos suasivos | `pedir`, `recomendar`, `sugerir`, `proponer`… | See the f_55 limit (disambiguation by mood not implemented). ⚠️ **Confirmed lemmatization limit:** UDPipe lemmatizes the diphthongized forms of `recomendar` irregularly and unpredictably (`recomienda`→`recomienda`, `recomiendan`→`recomiendar`, `recomiendo`→`recomir`), so *"El jefe recomienda que trabajen más."* gives 0 even though `recomendar` is in the dictionary. It was not patched with a list of surface forms because it is too unpredictable case by case; documented as a model limitation. |
 | `f_58_verb_seem` | Verbs of appearance or inference | Verbos de apariencia o inferencia | Configured `parecer` and `resultar` **only in copular use** (`resulta adecuada`); excludes `resultó ganador` and `resultó de`. Configured `verse` is also recovered from `ver` + reflexive pronoun + adjectival predication (`cop` to ADJ or ADJ `xcomp/acomp/attr` child). The pronoun may attach to `ver` or its copular predicate. | Anchored on the verb, not a contiguous phrase. No general separation of appearance from reflexive perception; nominal objects alone do not license `verse`. |
 
@@ -177,14 +177,30 @@ word has the intended discourse, degree, or epistemic function.
 | Code | Label | Spanish label | Actual rule | Notes / limits |
 |---|---|---|---|---|
 | `f_66_neg_synthetic` | Negation with negative words other than *no* | Negación mediante palabras negativas distintas de *no* | `nadie/nunca/jamás/tampoco/ningún(o/a)/nada` + `ni`. Deliberate overlaps with f_11/f_67 (negative concord). | — |
-| `f_67_neg_analytic` | Negation with the adverb *no* | Negación mediante el adverbio *no* | ADV/PART `no` with `advmod` or spaCy-style `neg`, attached to VERB/AUX/ADJ/ADV. Includes preverbal and focus negation (`respuesta no definitiva`, `no muy lejos`); excludes NOUN/INTJ uses. | `ni/tampoco` remain in f_66; negative-concord overlap is intentional. Real spaCy-model integration remains unverified. |
+| `f_67_neg_analytic` | Negation with the adverb *no* | Negación mediante el adverbio *no* | ADV/PART `no` with `advmod` or spaCy-style `neg`, attached to VERB/AUX/ADJ/ADV. Includes preverbal and focus negation (`respuesta no definitiva`, `no muy lejos`); excludes NOUN/INTJ uses. | `ni/tampoco` remain in f_66; negative-concord overlap is intentional. Native `es_core_news_sm` integration includes `No vino nadie`. |
 
 ---
 
 ## Known limitations (summary)
 
-Situations that reflect limits of the `spanish-gsd` model, not errors of the
-extractor. They are not forced (project methodology):
+Situations that reflect parser/model limits, not errors of the extractor.
+They are not forced (project methodology):
+
+- **spaCy reference integration**: `es_core_news_sm` 3.8.0 with spaCy 3.8.7
+  is tested through spacyr using explicitly requested `morph` attributes.
+  `ROOT` is normalized to `root`; native passive conventions are handled
+  without rewriting unrelated `aux/obj` dependencies. These integration
+  examples do not establish corpus-level precision/recall.
+- **spaCy POS and attachment errors**: `Puede siempre revisar el informe`
+  attaches `puede` to the ADV `siempre`, hiding both modality and the split;
+  `Ella canta y él baila` makes the pronouns heads, hiding clause coordination.
+  In `Preguntó dónde vive Ana`, `dónde` is PRON with `PronType=Ind`, hiding
+  the indirect question. Frozen regressions preserve these errors, with
+  corrected-annotation contrasts where appropriate.
+- **Parser tokenization**: spaCy retains some contractions and enclitics as
+  single tokens, while UDPipe supplies expanded UD component words. Counts
+  and normalization denominators can therefore differ for identical text.
+  Missing decompositions and multiword lemmas are not guessed.
 
 - **Argumental `se` vs. reflexive passive/impersonal** (f_08, f_17): morphologically
   identical (`Reflex=Yes`, `iobj`). f_08 excludes every `se`; f_17 uses the presence
