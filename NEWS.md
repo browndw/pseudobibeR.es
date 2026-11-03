@@ -15,11 +15,24 @@
 - `measure = "none"` now omits lexical diversity, rather than returning an
   undocumented lemma-based TTR.
 - Spanish datasets and reproducible builders replace inherited French samples.
-- Package builds exclude parser models, the temporary French reference, and
-  development outputs. Integration tests do not download models.
+- Removed the temporary French reference checkout from the Spanish project.
+  Package builds exclude parser models and development outputs. Integration
+  tests do not download models.
 
 ## Corrections that change results
 
+- Extraction and auditing now explicitly retrieve this package's Spanish
+  dictionaries and word lists. Namespace-only calls work without attaching
+  the package, and other packages' datasets cannot change Spanish counts or
+  audit evidence through attachment order.
+- Native Spanish spaCy annotations now normalize `ROOT` before structural
+  detection, fixing missed existential `haber` and direct questions incorrectly
+  included among indirect questions. SpaCy passives also accept `ser` tagged
+  `aux` with a verbal participle and nominal `por`-agents tagged `obj`;
+  these passive exceptions do not change UDPipe conventions.
+- Reflexive `darse cuenta` accepts the nominal `cuenta` dependency `compound`
+  as well as `obj`. Native spaCy integration, portable frozen annotations,
+  explicit morphology setup, and parser-tokenization limits are documented.
 - Modal recognition follows infinitival complements through flat and nested
   auxiliary chains, including passive/progressive complements. `tener que`,
   `haber de/que`, and `ir a` require their linked particles. `puede que`
