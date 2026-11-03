@@ -36,11 +36,33 @@ features <- pseudobibeR.es::biber(parsed, measure = "MATTR", normalize = TRUE)
 pseudobibeR.es::audit_features(parsed, feature = "f_18_by_passives")
 ```
 
-The equivalent spaCy workflow uses `spacyr::spacy_parse()` with `dependency`,
-`tag`, and `pos` enabled, followed by the same `biber()` call. Spanish-GSD is
-the reference integration model; other Spanish parsers require independent
-validation. Both adapters share UD-based detectors rather than assuming
-identical accuracy across parsers.
+For spaCy, use an existing Python environment containing spaCy and an installed
+Spanish model. This example uses the `r-spacyr` conda environment; select it
+before initializing Python in the R session:
+
+```r
+reticulate::use_condaenv("r-spacyr", required = TRUE)
+spacyr::spacy_initialize(model = "es_core_news_sm")
+parsed <- spacyr::spacy_parse(
+  c(doc_1 = "El informe fue redactado por el equipo.",
+    doc_2 = "Yo he terminado el informe."),
+  dependency = TRUE, tag = TRUE, pos = TRUE, entity = FALSE,
+  additional_attributes = "morph"
+)
+features <- pseudobibeR.es::biber(parsed, measure = "MATTR", normalize = TRUE)
+pseudobibeR.es::audit_features(parsed, feature = "f_18_by_passives")
+spacyr::spacy_finalize()
+```
+
+**Morphology is required:** `spacy_parse()` does not return it by default.
+Without `additional_attributes = "morph"`, Spanish extraction reports an error.
+Some spacyr versions issue a blanket warning about non-English lemmatization;
+this is upstream behavior, not a feature-extraction failure.
+
+Integration tests cover Spanish-GSD and spaCy `es_core_news_sm` (3.8.0 with
+spaCy 3.8.7). Both adapters share Spanish detectors, with narrow support for
+native root/passive conventions. This does not imply identical accuracy:
+model mistakes in POS, lemmas, morphology, and dependencies remain visible.
 
 For several documents, pass the complete annotated corpus to `biber()`.
 Use an ordinary data frame for results and your preferred export tools, such
@@ -55,7 +77,10 @@ as `utils::write.csv(features, "features.csv", row.names = FALSE)`.
   columns: f_09, f_12, f_15, f_28, f_31, f_32, f_59, f_60, f_61, and f_62.
 - Normalized counts use **1,000 UD word tokens**: punctuation, symbols, spaces,
   and multiword-token container rows are excluded; function words are included.
-  Expanded contractions and clitics count as their UD component words.
+  Expanded contractions and clitics count as their supplied component words.
+  spaCy may retain forms such as `al`, `del`, and `verlo` as single tokens;
+  the extractor does not invent a UD expansion, so denominators can differ
+  between parsers even for identical text.
   `n_tokens` reports the denominator.
 - `n_lex_tokens` counts nouns, proper nouns, verbs, adjectives, and adverbs;
   it is not the normalization denominator.
@@ -66,6 +91,9 @@ as `utils::write.csv(features, "features.csv", row.names = FALSE)`.
 - All non-metric counts are derived from the same occurrences used by auditing.
   Dictionary phrases and their component detections are reconciled before
   counting, within sentence boundaries.
+- Extraction and auditing use this package's Spanish dictionaries and word lists,
+  even when companion packages are attached. Calls through `pseudobibeR.es::`
+  do not require `library(pseudobibeR.es)`.
 
 Shared interfaces and identifiers do **not** establish cross-language
 measurement equivalence. See the [Spanish feature table](TABLA_RASGOS_ES.md)
@@ -82,14 +110,21 @@ testthat::test_local()
 devtools::check()
 ```
 
-Tests use small synthetic annotations without a parser installation. Optional
-integration tests use a locally supplied Spanish-GSD model; they skip if it is
-unavailable and never download it. Models, validation output, and the temporary
-French reference are excluded from package builds.
+Tests use small synthetic annotations and frozen native UDPipe/spaCy annotations
+without a parser installation. Optional live integration tests use locally
+installed models; test code never installs dependencies or downloads models.
+Models and validation output are excluded from package builds. The temporary
+French reference checkout is no longer kept inside the Spanish project.
 Set `PSEUDOBIBER_ES_UDPIPE_MODEL` to an absolute local model path, or put the
 reference model in `tests/models/`. Frozen Spanish annotations also exercise
 correctness regressions offline. Dataset rebuild instructions are in
 [data-raw](data-raw/README.md).
+To enable live spaCy tests, set `RETICULATE_PYTHON` to the Python executable in
+`r-spacyr` and `PSEUDOBIBER_ES_SPACY_MODEL=es_core_news_sm`, then run
+`testthat::test_local(filter = "spacy-pipeline")`. Without the model opt-in,
+only the live test skips; frozen spaCy regressions still run. The Tests GitHub
+Action provisions both reference models and enables live spaCy testing in an
+isolated `r-spacyr` environment.
 The development validation script uses the same local model setting and never
 installs packages or downloads models.
 
