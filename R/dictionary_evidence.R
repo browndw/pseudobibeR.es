@@ -26,6 +26,7 @@ surface_matches <- function(tokens, patterns) {
 }
 
 dictionary_evidence <- function(tokens, features) {
+  dict <- pseudobibeR.es::dict
   evidence <- list()
   spans <- list()
   for (feature in features) {

@@ -1,1 +1,1 @@
-utils::globalVariables(c("dict", "word_lists", ".data"))
+utils::globalVariables(".data")

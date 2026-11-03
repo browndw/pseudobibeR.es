@@ -8,7 +8,9 @@
 #'   `spacyr::spacy_parse()`. A data frame with either parser's columns is
 #'   also accepted. Required columns are `doc_id`, `sentence_id`, `token_id`,
 #'   `token`, `lemma`, `head_token_id`, `dep_rel`, and `upos`/`xpos` or
-#'   `pos`/`tag`. Morphology is supplied in `feats` or `morph`.
+#'   `pos`/`tag`. Morphology is supplied in `feats` or `morph`. With
+#'   `spacyr::spacy_parse()`, set `dependency = TRUE`, `tag = TRUE`,
+#'   `pos = TRUE`, and `additional_attributes = "morph"`.
 #' @param measure Lexical diversity measure: `"MATTR"`, `"TTR"`, `"CTTR"`,
 #'   `"MSTTR"`, or `"none"`. The latter omits `f_43_type_token`.
 #'   MATTR and MSTTR fall back to TTR separately for documents shorter
@@ -25,8 +27,10 @@
 #' @details
 #' Feature identifiers match the English and French companion packages,
 #' but Spanish heuristics are language-specific. Counts depend on the
-#' accuracy of the parser. UDPipe Spanish-GSD is the integration-test
-#' reference; other UD parsers should be independently validated.
+#' accuracy of the parser. Integration tests cover UDPipe Spanish-GSD and
+#' spaCy `es_core_news_sm`, not general cross-parser equivalence. Native spaCy
+#' root/passive conventions are supported. Tokenization and model errors can
+#' produce different counts and normalization denominators across parsers.
 #' Lexical diversity uses lower-case surface tokens, including punctuation,
 #' before phrase compounding. Mean word length uses UD word tokens.
 #' Documents retain their order of first appearance.

@@ -483,7 +483,7 @@ block_specialized_verbs_es <- function(tokens, doc_ids, dict_lookup) {
     dplyr::semi_join(
       tokens %>% dplyr::filter(
         .data$lemma == "cuenta", .data$pos == "NOUN",
-        stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^obj($|:)")
+        stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(obj|compound)($|:)")
       ),
       by = c("doc_id", "sentence_id", "token_id_int" = "head_token_id_int")
     )

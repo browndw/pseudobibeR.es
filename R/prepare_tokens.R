@@ -67,12 +67,17 @@ prepare_parsed_tokens <- function(tokens) {
     }
   }
   if (!"feats" %in% names(tokens)) {
-    stop("Missing morphology: supply 'feats' or 'morph'.", call. = FALSE)
+    stop(
+      "Missing morphology: supply 'feats' or 'morph'. ",
+      'For spacyr::spacy_parse(), set additional_attributes = "morph".',
+      call. = FALSE
+    )
   }
   tokens$feats <- as.character(tokens$feats)
   tokens$surface <- tokens$token
   tokens$token <- stringi::stri_trans_tolower(tokens$token)
   tokens$lemma <- stringi::stri_trans_tolower(tokens$lemma)
+  tokens$dep_rel <- stringi::stri_trans_tolower(tokens$dep_rel)
   tokens$pos[tokens$token == "\n"] <- "PUNCT"
   tokens <- tokens[tokens$pos != "SPACE", ]
   if (!all(doc_order %in% tokens$doc_id)) {

@@ -6,6 +6,8 @@
 parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy", "udpipe"),
                                  traced = FALSE) {
   engine <- match.arg(engine)
+  dict <- pseudobibeR.es::dict
+  word_lists <- pseudobibeR.es::word_lists
   doc_ids <- dplyr::distinct(tokens, .data$doc_id)
   tokens <- flag_mwe_tokens(tokens, get_word_list(word_lists, "multiword_patterns"))
   head_lookup <- tokens %>%
@@ -37,10 +39,7 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
     ),
     block_personal_pronouns_es(tokens, doc_ids),
     block_lexical_membership_es(tokens, doc_ids, word_lists),
-    block_passive_voice_es(
-      tokens, doc_ids, head_lookup,
-      if (engine == "spacy") c("auxpass", "aux:pass") else "aux:pass"
-    ),
+    block_passive_voice_es(tokens, doc_ids, head_lookup, engine),
     block_clause_embedding_es(tokens, doc_ids, head_lookup),
     block_participial_clauses_es(tokens, doc_ids, head_lookup),
     block_relatives_es(tokens, doc_ids, head_lookup),

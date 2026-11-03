@@ -4,8 +4,8 @@
 #
 #   (A) PERIPHRASTIC passive (ser/estar + participle)
 #       <<El libro fue escrito por Galdos.>>
-#       The UD parser marks the auxiliary with dep_rel = aux:pass.
-#       Detected by passive_rel_values (same as French).
+#       UDPipe uses aux:pass. Spanish spaCy also uses plain aux for ser
+#       attached to a verbal participle.
 #
 #   (B) REFLEXIVE / SE-PASSIVE
 #       <<Se publico el informe.>>
@@ -30,28 +30,35 @@
 #' pasiva refleja (se + VerbForm=Part/Fin, expl:pass). Excluye haber
 #' perfect de f_17/f_18. Distingue ser/estar copulativo (f_19) del
 #' auxiliar de pasiva. Detecta haber impersonal-existencial (f_20).
+#' Spanish spaCy also permits ser + aux attached to a verbal participle
+#' and nominal por-agents attached as obj.
 #'
 #' @param tokens Annotated token data frame
 #' @param doc_ids Document IDs
 #' @param head_lookup Head token lookup table
-#' @param passive_rel_values Dependency relation values for passive aux
-#'   ("aux:pass" for udpipe; c("auxpass","aux:pass") for spaCy)
+#' @param engine Parser convention: "udpipe" or "spacy"
 #' @return Data frame con f_17 a f_20
 #' @keywords internal
 block_passive_voice_es <- function(tokens, doc_ids, head_lookup,
-                                   passive_rel_values) {
+                                   engine) {
+  passive_rel_values <- if (engine == "spacy") c("auxpass", "aux:pass") else "aux:pass"
 
   # -----------------------------------------------------------------------
   # (A) Periphrastic passive -- aux marked as aux:pass
   # -----------------------------------------------------------------------
   perifrastic_passive <- tokens %>%
-    dplyr::filter(.data$dep_rel %in% passive_rel_values,
+    dplyr::filter(.data$pos %in% c("VERB", "AUX"),
                   .data$lemma %in% c("ser", "estar"),
                   !is.na(.data$head_token_id_int)) %>%
     dplyr::left_join(head_lookup,
                      by = c("doc_id", "sentence_id",
                             "head_token_id_int" = "token_id_int")) %>%
-    dplyr::filter(.data$head_pos == "VERB") %>%
+    dplyr::filter(
+      .data$head_pos == "VERB",
+      .data$dep_rel %in% passive_rel_values |
+        (engine == "spacy" & .data$lemma == "ser" & .data$dep_rel == "aux" &
+           .data$head_morph_verbform == "Part")
+    ) %>%
     dplyr::distinct(.data$doc_id, .data$sentence_id,
                     .data$head_token_id_int, .keep_all = TRUE)
 
@@ -149,9 +156,11 @@ block_passive_voice_es <- function(tokens, doc_ids, head_lookup,
       por_objects,
       by = c("doc_id", "sentence_id", "token_id_int" = "agent_id")
     ) %>%
-    dplyr::filter(stringr::str_detect(
-      dplyr::coalesce(.data$dep_rel, ""), "^(obl(:.*)?|agent)$"
-    )) %>%
+    dplyr::filter(
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(obl(:.*)?|agent)$") |
+        (engine == "spacy" & .data$dep_rel == "obj" &
+           .data$pos %in% c("NOUN", "PROPN", "PRON"))
+    ) %>%
     dplyr::distinct(.data$doc_id, .data$sentence_id, .data$head_token_id_int) %>%
     dplyr::mutate(has_agent = TRUE)
   all_passive <- all_passive %>%
