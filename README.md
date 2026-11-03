@@ -1,3 +1,10 @@
+[![R-CMD-check](https://github.com/browndw/pseudobibeR.es/workflows/R-CMD-check/badge.svg)](https://github.com/browndw/pseudobibeR.es/actions)
+[![Tests](https://github.com/browndw/pseudobibeR.es/workflows/Tests/badge.svg)](https://github.com/browndw/pseudobibeR.es/actions)
+[![CRAN status](https://www.r-pkg.org/badges/version/pseudobibeR.es)](https://CRAN.R-project.org/package=pseudobibeR.es)
+[![CRAN downloads](https://cranlogs.r-pkg.org/badges/pseudobibeR.es)](https://cran.r-project.org/package=pseudobibeR.es)
+[![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # pseudobibeR.es
 
 Spanish adaptations of Biber's lexicogrammatical features, with the same basic
