@@ -21,6 +21,11 @@
 
 ## Corrections that change results
 
+- Lexical diversity uses one measure for the entire supplied corpus. Default
+  MATTR falls back to TTR for every document if any document has fewer than
+  200 tokens, with one message. Explicit TTR, CTTR, and MSTTR choices are retained.
+  Calculation uses a single corpus-wide `quanteda.textstats` call, including
+  its shared MSTTR segment adjustment and warning for short documents.
 - Extraction and auditing now explicitly retrieve this package's Spanish
   dictionaries and word lists. Namespace-only calls work without attaching
   the package, and other packages' datasets cannot change Spanish counts or
@@ -78,7 +83,7 @@
 - Frequencies are now normalized per 1,000 UD words, excluding punctuation,
   symbols, spaces, and multiword-token containers. Previously the denominator
   included punctuation and depended on phrase compounding.
-- Lexical-diversity fallback and adjective fallback are document-local.
+- Adjective fallback is document-local.
 - Dictionary and grammatical detections no longer double-count specialized
   verbs. Counts and auditing share detection-level evidence, including
   dictionary phrases and prepositional locutions.
