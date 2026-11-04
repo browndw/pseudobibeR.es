@@ -95,20 +95,21 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
     counts <- normalize_counts(counts)
   }
   if (measure != "none") {
-    sentences <- split(tokens$token, match(tokens$doc_id, doc_ids$doc_id))
-    lexdiv <- vapply(sentences, function(words) {
-      actual <- measure
-      if (measure %in% c("MATTR", "MSTTR") && length(words) < 200L) {
-        message("Setting type-to-token ratio to TTR")
-        actual <- "TTR"
-      }
-      result <- quanteda.textstats::textstat_lexdiv(
-        quanteda::as.tokens(list(words)), measure = actual,
-        remove_punct = FALSE, remove_numbers = FALSE, remove_symbols = FALSE
-      )
-      result[[actual]][1L]
-    }, numeric(1))
-    counts$f_43_type_token <- unname(lexdiv[as.character(seq_len(nrow(doc_ids)))])
+    document_tokens <- quanteda::as.tokens(split(
+      tokens$token, match(tokens$doc_id, doc_ids$doc_id)
+    ))
+    actual <- measure
+    if (measure == "MATTR" && any(quanteda::ntoken(document_tokens) < 200L)) {
+      message("Setting type-to-token ratio to TTR")
+      actual <- "TTR"
+    }
+    lexdiv <- quanteda.textstats::textstat_lexdiv(
+      document_tokens, measure = actual,
+      remove_punct = FALSE, remove_numbers = FALSE, remove_symbols = FALSE
+    )
+    counts$f_43_type_token <- lexdiv[[actual]][
+      match(as.character(seq_len(nrow(doc_ids))), lexdiv$document)
+    ]
   }
   counts <- counts[, c("doc_id", intersect(names(.feature_categories), names(counts)),
                        "n_tokens", "n_lex_tokens")]

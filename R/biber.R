@@ -13,8 +13,9 @@
 #'   `pos = TRUE`, and `additional_attributes = "morph"`.
 #' @param measure Lexical diversity measure: `"MATTR"`, `"TTR"`, `"CTTR"`,
 #'   `"MSTTR"`, or `"none"`. The latter omits `f_43_type_token`.
-#'   MATTR and MSTTR fall back to TTR separately for documents shorter
-#'   than 200 tokens, with a message.
+#'   MATTR is the default. If any document has fewer than 200 tokens,
+#'   MATTR falls back to TTR for the entire corpus, with one message.
+#'   Explicitly selected TTR, CTTR, and MSTTR are retained for all documents.
 #' @param normalize Logical. Normalize counts per 1,000 UD word tokens,
 #'   excluding punctuation, symbols, spaces, and multiword-token container
 #'   rows. Function words are included. Metrics are never normalized.
@@ -32,7 +33,11 @@
 #' root/passive conventions are supported. Tokenization and model errors can
 #' produce different counts and normalization denominators across parsers.
 #' Lexical diversity uses lower-case surface tokens, including punctuation,
-#' before phrase compounding. Mean word length uses UD word tokens.
+#' before phrase compounding. These tokens also determine the 200-token
+#' fallback threshold, rather than the normalization denominator `n_tokens`.
+#' One lexical-diversity measure is used throughout each supplied corpus.
+#' For MSTTR, `quanteda.textstats` may shorten the common segment length
+#' for short documents and issues a warning. Mean word length uses UD word tokens.
 #' Documents retain their order of first appearance.
 #'
 #' @seealso [audit_features()], [dict], [word_lists]
