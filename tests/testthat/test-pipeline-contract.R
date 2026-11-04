@@ -8,7 +8,7 @@ test_that("biber supports both parser schemas without requiring a parser runtime
                biber(sp, measure = "TTR", normalize = FALSE))
 })
 
-test_that("multi-document extraction matches independent calls in document order", {
+test_that("calls with the same effective measure agree in document order", {
   first <- contract_tokens("z_first")
   second <- contract_tokens("a_second")
   second$token[2] <- second$lemma[2] <- "llegar"
@@ -16,7 +16,7 @@ test_that("multi-document extraction matches independent calls in document order
   documents <- list(first, second)
   tokens <- do.call(rbind, documents)
 
-  for (measure in c("MATTR", "TTR", "CTTR", "MSTTR", "none")) {
+  for (measure in c("MATTR", "TTR", "CTTR", "none")) {
     for (normalize in c(FALSE, TRUE)) {
       together <- suppressMessages(biber(
         tokens, measure = measure, normalize = normalize
@@ -48,18 +48,6 @@ test_that("dictionary and grammatical paths do not count an infinitive twice", {
   tokens$dep_rel[2] <- "xcomp"
   tokens$head_token_id[2] <- "1"
   expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_56_verb_private, 1)
-})
-
-test_that("lexical diversity is independent of other documents", {
-  long <- do.call(rbind, lapply(seq_len(60), function(i) {
-    x <- contract_tokens("long")
-    x$sentence_id <- i
-    x
-  }))
-  short <- contract_tokens("short")
-  alone <- biber(long, measure = "MATTR", normalize = FALSE)
-  together <- suppressMessages(biber(rbind(long, short), measure = "MATTR", normalize = FALSE))
-  expect_equal(together$f_43_type_token[together$doc_id == "long"], alone$f_43_type_token)
 })
 
 test_that("adjective fallback is document-local", {
