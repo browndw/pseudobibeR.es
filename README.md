@@ -85,8 +85,13 @@ as `utils::write.csv(features, "features.csv", row.names = FALSE)`.
 - `n_lex_tokens` counts nouns, proper nouns, verbs, adjectives, and adverbs;
   it is not the normalization denominator.
 - Lexical diversity uses lower-case surface tokens, including punctuation,
-  before phrase compounding. MATTR and MSTTR fall back to TTR separately for
-  documents shorter than 200 tokens, with a message. CTTR is not replaced.
+  before phrase compounding. MATTR is the default; if any document has fewer
+  than 200 of these tokens, the entire supplied corpus uses TTR, with one
+  message. Measures are never mixed within a corpus. Explicitly selected TTR,
+  CTTR, and MSTTR are retained for every document. MSTTR may trigger a
+  `quanteda.textstats` warning when its common segment length is shortened.
+  For multivariate comparisons, supply the whole corpus together and use the
+  same measure across any separately processed corpora.
 - Mean word length and lexical diversity are never normalized.
 - All non-metric counts are derived from the same occurrences used by auditing.
   Dictionary phrases and their component detections are reconciled before
