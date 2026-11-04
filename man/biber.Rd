@@ -42,8 +42,9 @@ also accepted. Required columns are \code{doc_id}, \code{sentence_id}, \code{tok
 
 \item{measure}{Lexical diversity measure: \code{"MATTR"}, \code{"TTR"}, \code{"CTTR"},
 \code{"MSTTR"}, or \code{"none"}. The latter omits \code{f_43_type_token}.
-MATTR and MSTTR fall back to TTR separately for documents shorter
-than 200 tokens, with a message.}
+MATTR is the default. If any document has fewer than 200 tokens,
+MATTR falls back to TTR for the entire corpus, with one message.
+Explicitly selected TTR, CTTR, and MSTTR are retained for all documents.}
 
 \item{normalize}{Logical. Normalize counts per 1,000 UD word tokens,
 excluding punctuation, symbols, spaces, and multiword-token container
@@ -68,7 +69,11 @@ spaCy \code{es_core_news_sm}, not general cross-parser equivalence. Native spaCy
 root/passive conventions are supported. Tokenization and model errors can
 produce different counts and normalization denominators across parsers.
 Lexical diversity uses lower-case surface tokens, including punctuation,
-before phrase compounding. Mean word length uses UD word tokens.
+before phrase compounding. These tokens also determine the 200-token
+fallback threshold, rather than the normalization denominator \code{n_tokens}.
+One lexical-diversity measure is used throughout each supplied corpus.
+For MSTTR, \code{quanteda.textstats} may shorten the common segment length
+for short documents and issues a warning. Mean word length uses UD word tokens.
 Documents retain their order of first appearance.
 }
 \examples{
