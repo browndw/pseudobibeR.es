@@ -31,16 +31,47 @@ corpus to `biber()`; one output row is returned per document. UDPipe and spaCy
 annotations use the same public interface. Parsing and export remain the
 responsibility of the caller.
 
+For spaCy, initialize an installed Spanish model in your chosen Python
+environment (for example `r-spacyr`). The following is not run when building
+the vignette, because Python and its model are external prerequisites:
+
+```{r, eval=FALSE}
+reticulate::use_condaenv("r-spacyr", required = TRUE)
+spacyr::spacy_initialize(model = "es_core_news_sm")
+parsed <- spacyr::spacy_parse(
+  c(doc_1 = "Yo he terminado el informe.", doc_2 = "No vino nadie."),
+  dependency = TRUE, tag = TRUE, pos = TRUE, entity = FALSE,
+  additional_attributes = "morph"
+)
+biber(parsed, measure = "TTR", normalize = FALSE)
+audit_features(parsed, feature = "f_02_perfect_aspect")
+spacyr::spacy_finalize()
+```
+
+Morphology must be explicitly requested; the default `spacy_parse()` output
+does not supply it. Both native Python morphology objects and serialized
+morphology strings are accepted. Optional live tests and frozen annotations
+exercise the Spanish spaCy model, but do not establish corpus-level accuracy.
+
 ## Interpretation
 
 `normalize = TRUE` divides counts by the document's `n_tokens` and multiplies by
 1,000. Function words count in that denominator; punctuation, symbols, spaces,
 and UD multiword-token containers do not. `n_lex_tokens` is a separate descriptive
 total, not the denominator. The two lexical metrics are not normalized.
+Tokenization remains parser-specific: a contraction or enclitic retained as
+one spaCy token counts once, whereas supplied UD component words count
+separately. The extractor does not infer a missing decomposition.
 
 The usual output has 67 feature columns. `measure = "none"` omits lexical
-diversity. MATTR and MSTTR use TTR for individual documents shorter than 200
-tokens. A document's features do not change when unrelated documents are added.
+diversity. MATTR is the default; if any document has fewer than 200 surface
+tokens, including punctuation, the whole supplied corpus uses TTR, with one
+message. Thus, every document contributes a value from the same measure.
+Explicitly selected TTR, CTTR, and MSTTR are retained throughout the corpus.
+For MSTTR, `quanteda.textstats` may shorten its common segment length and warns.
+Supply the complete corpus together rather than processing documents
+independently when relying on automatic fallback. For multivariate analysis,
+use the same measure across all compared corpora before scaling.
 
 Ten columns are zero by compatibility convention, not measured absences.
 Language-specific constructions, parser errors, and lexical inventories mean
