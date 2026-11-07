@@ -22,7 +22,7 @@ This development package is not yet a CRAN release.
 library(udpipe)
 library(pseudobibeR.es)
 
-# Download and load French model (only needed once)
+# Download and load Spanish model (only needed once)
 model <- udpipe_download_model(language = "spanish-gsd")
 ud_model <- udpipe_load_model(model$file_model)
 
