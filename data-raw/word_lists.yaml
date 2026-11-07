@@ -707,6 +707,14 @@ negation_particles:
   # Particula principal de negacion (usada como check rapido)
   - "no"
 
+neg_nominal_no_modifiers:
+  # Article + nominalized no + rejection descriptor, not bare adjective negation.
+  - rotundo
+  - tajante
+  - categórico
+  - contundente
+  - terminante
+
 # ---------------------------------------------------------------------------
 # FRASES PREPOSICIONALES (f_39)
 # prepositions_compound is the shared inventory used by block_adj_prep_adv_es().

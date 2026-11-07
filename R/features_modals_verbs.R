@@ -126,7 +126,8 @@ expand_adjective_conjuncts <- function(tokens, rows) {
 #' f_39  ADP tokens, with inventoried prepositional phrases counted once
 #' f_40  Attributive adjectives and their conjuncts, with nonpredicative fallback
 #' f_41  Predicative adjectives and their conjuncts (xcomp/acomp/cop target/attr)
-#' f_42  All ADV tokens, including overlap with other adverbial features
+#' f_42  ADV candidates; the final pipeline excludes occurrences counted as
+#' place/time adverbials, downtoners, hedges, or amplifiers
 #'
 #' @param tokens Annotated token data frame
 #' @param doc_ids One-column data frame with column `doc_id`
@@ -267,15 +268,7 @@ block_adj_prep_adv_es <- function(tokens, doc_ids, dict_lookup,
   f40 <- expand_adjective_conjuncts(tokens, f40_rows) %>%
     count_feature_traced("f_40_adj_attr")
 
-  # f_42  Total adverbs (HERNAN REVIEW, Phase 1).
-  # The English feature is "Total adverbs". The earlier residual version excluded
-  # f_04/f_05/f_23/f_45-f_50/f_67 and therefore did NOT measure the same as the
-  # English or French package. New rule: count ALL ADV tokens, with no
-  # exclusions. The overlaps are deliberate (e.g. 'hoy' counts in
-  # f_05 and in f_42; 'muy' in f_48 and in f_42; 'no' in f_67 and in f_42). From f_50
-  # only the units that are formally ADV enter here: 'mira'/'vamos'
-  # (verbs) do not count. The negation_adverbs parameter is left unused on
-  # purpose after this simplification.
+  # Exclusions require the final reconciled evidence and dictionary phrase spans.
   f42 <- tokens %>%
     dplyr::filter(.data$pos == "ADV") %>%
     count_feature_traced("f_42_adverbs")
@@ -290,6 +283,26 @@ block_adj_prep_adv_es <- function(tokens, doc_ids, dict_lookup,
     )
   evidence <- bind_evidence(f39$evidence, f40$evidence, f41$evidence, f42$evidence)
   make_block_result(counts = counts, evidence = evidence)
+}
+
+exclude_specialized_adverbs <- function(evidence, spans) {
+  features <- c("f_04_place_adverbials", "f_05_time_adverbials", "f_46_downtoners",
+                "f_47_hedges", "f_48_amplifiers")
+  adverbs <- evidence[evidence$feature == "f_42_adverbs", ]
+  adverbs$.evidence_row <- which(evidence$feature == "f_42_adverbs")
+  excluded <- dplyr::semi_join(
+    adverbs, evidence[evidence$feature %in% features, ],
+    by = c("doc_id", "sentence_id", "token_id")
+  )$.evidence_row
+  # A phrase can contain several adverbs or have a non-adverb evidence anchor.
+  phrase_rows <- dplyr::inner_join(
+    adverbs, spans[spans$feature %in% features, ],
+    by = dplyr::join_by("doc_id", "sentence_id",
+                        "token_id" >= "start", "token_id" <= "end"),
+    relationship = "many-to-many"
+  )$.evidence_row
+  excluded <- c(excluded, phrase_rows)
+  evidence[!seq_len(nrow(evidence)) %in% excluded, ]
 }
 
 # -----------------------------------------------------------------------------

@@ -52,13 +52,22 @@ test_that("the MATTR fallback threshold is strictly below 200 diversity tokens",
   punctuation$upos[200] <- punctuation$xpos[200] <- "PUNCT"
   punctuation$dep_rel[200] <- "punct"
   punctuation$head_token_id[200] <- "199"
-  expect_message(with_punctuation <- biber(punctuation, normalize = FALSE), NA)
-  expect_equal(with_punctuation$n_tokens, 199)
-  reference <- quanteda.textstats::textstat_lexdiv(
-    quanteda::as.tokens(list(punctuation$token)), measure = "MATTR",
-    remove_punct = FALSE, remove_numbers = FALSE, remove_symbols = FALSE
+  expect_message(
+    with_punctuation <- biber(punctuation, normalize = FALSE),
+    "Setting type-to-token ratio to TTR"
   )
-  expect_equal(with_punctuation$f_43_type_token, reference$MATTR)
+  expect_equal(with_punctuation$n_tokens, 199)
+  expect_equal(with_punctuation$f_43_type_token, 2 / 199)
+
+  numbers <- boundary
+  numbers$token[200] <- numbers$lemma[200] <- "42"
+  numbers$upos[200] <- numbers$xpos[200] <- "NUM"
+  expect_message(
+    with_numbers <- biber(numbers, normalize = FALSE),
+    "Setting type-to-token ratio to TTR"
+  )
+  expect_equal(with_numbers$n_tokens, 200)
+  expect_equal(with_numbers$f_43_type_token, 2 / 199)
 })
 
 test_that("explicit TTR and CTTR are retained across mixed document lengths", {

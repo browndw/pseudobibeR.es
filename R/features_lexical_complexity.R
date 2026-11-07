@@ -1,6 +1,17 @@
 LEXICAL_UPOS <- c("NOUN", "VERB", "ADJ", "ADV", "PROPN")
 PUNCT_UPOS <- c("PUNCT", "SYM", "SPACE")
 
+lexical_diversity_tokens <- function(tokens, doc_ids) {
+  words <- tokens[!tokens$pos %in% PUNCT_UPOS, ]
+  tags <- dplyr::coalesce(dplyr::na_if(words$tag, "_"), words$pos)
+  tagged <- paste(words$token, stringi::stri_trans_tolower(tags), sep = "_")
+  documents <- factor(
+    match(words$doc_id, doc_ids$doc_id), levels = seq_len(nrow(doc_ids))
+  )
+  quanteda::as.tokens(split(tagged, documents)) %>%
+    quanteda::tokens_remove("\\d_", valuetype = "regex")
+}
+
 block_lexical_complexity_es <- function(tokens, doc_ids) {
   words <- tokens[!tokens$pos %in% PUNCT_UPOS, ]
   metrics <- words %>%

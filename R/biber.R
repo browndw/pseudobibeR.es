@@ -13,7 +13,7 @@
 #'   `pos = TRUE`, and `additional_attributes = "morph"`.
 #' @param measure Lexical diversity measure: `"MATTR"`, `"TTR"`, `"CTTR"`,
 #'   `"MSTTR"`, or `"none"`. The latter omits `f_43_type_token`.
-#'   MATTR is the default. If any document has fewer than 200 tokens,
+#'   MATTR is the default. If any document has fewer than 200 retained tokens,
 #'   MATTR falls back to TTR for the entire corpus, with one message.
 #'   Explicitly selected TTR, CTTR, and MSTTR are retained for all documents.
 #' @param normalize Logical. Normalize counts per 1,000 UD word tokens,
@@ -32,12 +32,19 @@
 #' spaCy `es_core_news_sm`, not general cross-parser equivalence. Native spaCy
 #' root/passive conventions are supported. Tokenization and model errors can
 #' produce different counts and normalization denominators across parsers.
-#' Lexical diversity uses lower-case surface tokens, including punctuation,
-#' before phrase compounding. These tokens also determine the 200-token
-#' fallback threshold, rather than the normalization denominator `n_tokens`.
+#' Lexical diversity uses lower-case surface-plus-tag types, not lemmas.
+#' Fine-grained parser tags are retained; missing or `"_"` tags use UPOS.
+#' Punctuation, symbols, and spaces are excluded using UD POS labels.
+#' The English numeric pattern `\\d_` removes numeric matches from the
+#' tagged stream, including digit-final surface forms; spelled-out numerals
+#' remain words. Dictionary phrases are not compounded for this metric.
+#' Retained tokens determine the 200-token fallback threshold, rather than
+#' the normalization denominator `n_tokens`, which still includes number words.
 #' One lexical-diversity measure is used throughout each supplied corpus.
 #' For MSTTR, `quanteda.textstats` may shorten the common segment length
 #' for short documents and issues a warning. Mean word length uses UD word tokens.
+#' Documents with no retained diversity tokens receive `NA` for
+#' `f_43_type_token`, with a warning identifying those documents.
 #' Documents retain their order of first appearance.
 #'
 #' @seealso [audit_features()], [dict], [word_lists]

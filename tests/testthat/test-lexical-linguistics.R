@@ -95,7 +95,7 @@ test_that("the preposition inventory drives complete single-occurrence phrase au
   expect_equal(audit$right, rep("Ana", length(phrases)))
 })
 
-test_that("adverbial phrases reconcile lemma evidence and preserve total adverbs", {
+test_that("counted place and time phrases are excluded from f_42", {
   place <- contract_clause(
     "place", c("alrededor", "de", "aqui"), c("alrededor", "de", "aqu\u00ed"),
     c("ADV", "ADP", "ADV"), c(0, 3, 1), c("root", "case", "obl")
@@ -109,7 +109,7 @@ test_that("adverbial phrases reconcile lemma evidence and preserve total adverbs
   raw <- biber(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_04_place_adverbials, c(2, 0))
   expect_equal(raw$f_05_time_adverbials, c(0, 2))
-  expect_equal(raw$f_42_adverbs, c(2, 2))
+  expect_equal(raw$f_42_adverbs, c(0, 0))
   expect_setequal(audit_features(tokens, feature = "f_04_place_adverbials")$keyword,
                   c("alrededor de", "aqui"))
   expect_setequal(audit_features(tokens, feature = "f_05_time_adverbials")$keyword,

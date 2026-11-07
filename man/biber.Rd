@@ -42,7 +42,7 @@ also accepted. Required columns are \code{doc_id}, \code{sentence_id}, \code{tok
 
 \item{measure}{Lexical diversity measure: \code{"MATTR"}, \code{"TTR"}, \code{"CTTR"},
 \code{"MSTTR"}, or \code{"none"}. The latter omits \code{f_43_type_token}.
-MATTR is the default. If any document has fewer than 200 tokens,
+MATTR is the default. If any document has fewer than 200 retained tokens,
 MATTR falls back to TTR for the entire corpus, with one message.
 Explicitly selected TTR, CTTR, and MSTTR are retained for all documents.}
 
@@ -68,12 +68,19 @@ accuracy of the parser. Integration tests cover UDPipe Spanish-GSD and
 spaCy \code{es_core_news_sm}, not general cross-parser equivalence. Native spaCy
 root/passive conventions are supported. Tokenization and model errors can
 produce different counts and normalization denominators across parsers.
-Lexical diversity uses lower-case surface tokens, including punctuation,
-before phrase compounding. These tokens also determine the 200-token
-fallback threshold, rather than the normalization denominator \code{n_tokens}.
+Lexical diversity uses lower-case surface-plus-tag types, not lemmas.
+Fine-grained parser tags are retained; missing or \code{"_"} tags use UPOS.
+Punctuation, symbols, and spaces are excluded using UD POS labels.
+The English numeric pattern \verb{\\\\d_} removes numeric matches from the
+tagged stream, including digit-final surface forms; spelled-out numerals
+remain words. Dictionary phrases are not compounded for this metric.
+Retained tokens determine the 200-token fallback threshold, rather than
+the normalization denominator \code{n_tokens}, which still includes number words.
 One lexical-diversity measure is used throughout each supplied corpus.
 For MSTTR, \code{quanteda.textstats} may shorten the common segment length
 for short documents and issues a warning. Mean word length uses UD word tokens.
+Documents with no retained diversity tokens receive \code{NA} for
+\code{f_43_type_token}, with a warning identifying those documents.
 Documents retain their order of first appearance.
 }
 \examples{

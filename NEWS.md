@@ -21,6 +21,22 @@
 
 ## Corrections that change results
 
+- Total adverbs (`f_42_adverbs`) now follows Biber's exclusion definition:
+  ADV occurrences counted as place/time adverbials, downtoners, hedges, or
+  amplifiers are excluded. The union of actual detections and full phrase spans
+  determines exclusions; feature totals are not subtracted. Conjuncts,
+  emphatics, discourse particles, and negation are not additional exclusions.
+  Specialized counts, normalization denominators, and lexical metrics are
+  unchanged; f_42 audit rows now describe only its retained occurrences.
+- Lexical diversity now uses lower-case surface-plus-tag types, matching the
+  original English type definition rather than untagged surfaces. Fine-grained
+  tags are retained; missing or `_` tags use UPOS. Punctuation, symbols, and
+  spaces are excluded by UD POS, and English-style numeric matches are removed
+  before selecting the corpus measure or calculating diversity. Spelled-out
+  numerals remain words; dictionary phrases are not compounded for this metric.
+  Filtered-empty documents receive an explicit `NA` metric and identifying warning.
+  Word-count normalization, mean word length, and feature occurrence counts
+  continue to use their existing token populations.
 - Lexical diversity uses one measure for the entire supplied corpus. Default
   MATTR falls back to TTR for every document if any document has fewer than
   200 tokens, with one message. Explicit TTR, CTTR, and MSTTR choices are retained.
@@ -54,8 +70,15 @@
   coordination. Initial `y/e` uses actual sentence position, not token ID 1,
   and requires a verbal predicate or a finite copula rather than a fragment.
 - Analytic negation requires ADV/PART and accepts `advmod` or spaCy-style `neg`;
-  nominal and interjection uses of `no` are excluded. Existing negative-concord
-  overlap between negative words and `no` is unchanged.
+  valid nominal, pronominal, numeral, and function-word scopes now count alongside
+  verbal/adjectival/adverbial scope. Counts and audits identify the `no` marker,
+  never a consumed noun phrase. Contextual guards exclude `no obstante`,
+  identifiable reply prefixes, nominalized `no`, and quoted standalone `no`
+  while retaining `la no violencia`, `un no fumador`, parenthetical negation,
+  and quoted negative clauses. General semantic disambiguation, including
+  expletive `no` and non-negative `no más`, remains unresolved. Existing f_66
+  inventory, negative-concord overlap, f_42 mapping, noun counts, denominators,
+  and lexical metrics are unchanged.
 - Hyphenated UD nouns and attributive adjectives are no longer discarded.
   Attributive and predicative roles propagate through adjective coordination
   chains. Explicit predicates are excluded from attributive fallback, and

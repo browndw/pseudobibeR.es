@@ -38,7 +38,7 @@ test_that("none omits diversity and short CTTR is not replaced by TTR", {
   tokens <- contract_tokens()
   expect_false("f_43_type_token" %in% names(biber(tokens, measure = "none")))
   expect_length(grep("^f_", names(biber(tokens, measure = "none"))), 66)
-  expect_equal(biber(tokens, measure = "CTTR")$f_43_type_token, 4 / sqrt(8))
+  expect_equal(biber(tokens, measure = "CTTR")$f_43_type_token, 3 / sqrt(6))
 })
 
 test_that("the public namespace exposes common pipelines, not applications", {

@@ -20,20 +20,33 @@ This development package is not yet a CRAN release.
 
 ```r
 library(udpipe)
+library(pseudobibeR.es)
 
-# Download once, outside the package. No models are downloaded by biber().
-model_file <- udpipe_download_model("spanish-gsd")$file_model
-model <- udpipe_load_model(model_file)
-parsed <- udpipe_annotate(
-  model,
-  x = c("El informe fue redactado por el equipo.",
-        "Yo creo que podemos mejorar."),
+# Download and load French model (only needed once)
+model <- udpipe_download_model(language = "spanish-gsd")
+ud_model <- udpipe_load_model(model$file_model)
+
+# Prepare your text data
+text_data <- data.frame(
   doc_id = c("doc_1", "doc_2"),
-  tagger = "default", parser = "default"
+  text = c(
+    "El informe fue redactado por el equipo.",
+    "Yo creo que podemos mejorar."
+  )
 )
 
-features <- pseudobibeR.es::biber(parsed, measure = "MATTR", normalize = TRUE)
-pseudobibeR.es::audit_features(parsed, feature = "f_18_by_passives")
+# Parse the text
+parsed_data <- udpipe_annotate(
+  ud_model,
+  x = text_data$text,
+  doc_id = text_data$doc_id,
+  tagger = "default",
+  parser = "default"
+)
+
+# Extract features
+features <- biber(parsed_data, measure = "none", normalize = FALSE)
+print(features)
 ```
 
 For spaCy, use an existing Python environment containing spaCy and an installed
@@ -84,18 +97,41 @@ as `utils::write.csv(features, "features.csv", row.names = FALSE)`.
   `n_tokens` reports the denominator.
 - `n_lex_tokens` counts nouns, proper nouns, verbs, adjectives, and adverbs;
   it is not the normalization denominator.
-- Lexical diversity uses lower-case surface tokens, including punctuation,
-  before phrase compounding. MATTR is the default; if any document has fewer
-  than 200 of these tokens, the entire supplied corpus uses TTR, with one
-  message. Measures are never mixed within a corpus. Explicitly selected TTR,
+- Lexical diversity uses lower-case **surface-plus-tag types**, not lemmas.
+  Identical surface words with different parser tags are different types.
+  Fine-grained tags are retained; missing or `_` tags use UPOS. Punctuation,
+  symbols, and spaces are excluded by UD POS; the English numeric pattern
+  `\d_` removes numeric matches from the tagged stream, including digit-final
+  surface forms. Spelled-out numerals remain words. Dictionary phrases are
+  not compounded for this metric.
+- MATTR is the default; if any document has fewer than 200 retained diversity
+  tokens, the entire supplied corpus uses TTR, with one message.
+  This filtered population differs from `n_tokens`, which includes number words.
+  Measures are never mixed within a corpus. Explicitly selected TTR,
   CTTR, and MSTTR are retained for every document. MSTTR may trigger a
   `quanteda.textstats` warning when its common segment length is shortened.
   For multivariate comparisons, supply the whole corpus together and use the
   same measure across any separately processed corpora.
+- Documents with no retained diversity tokens receive `NA` for
+  `f_43_type_token`, with an identifying warning.
 - Mean word length and lexical diversity are never normalized.
 - All non-metric counts are derived from the same occurrences used by auditing.
   Dictionary phrases and their component detections are reconciled before
   counting, within sentence boundaries.
+- Total adverbs (`f_42_adverbs`) excludes ADV occurrences counted as place/time
+  adverbials, downtoners, hedges, or amplifiers (f_04, f_05, f_46, f_47, f_48).
+  Exclusions cover ADV members of counted phrases, not just their first tokens.
+  Conjuncts, emphatics, discourse particles, and negation are not additional
+  exclusions. Specialized counts and the word-token denominator are unchanged.
+- Analytic negation (`f_67_neg_analytic`) counts the scoped `no` word, not its
+  full phrase. ADV/PART `no` with `advmod` or `neg` can negate nominal,
+  pronominal, numeral, and other word constituents as well as predicates.
+  Nouns remain available to their own features. Guarded exclusions cover
+  `no obstante`, identifiable replies, nominalized `no`, and quoted standalone
+  `no`; a quoted negative clause still counts. These guards use local syntax
+  and context, not general semantic disambiguation. Expletive `no` and
+  non-negative `no más` readings remain unresolved. The f_66 inventory,
+  negative-concord counts, and f_42 ADV/PART mapping are unchanged.
 - Extraction and auditing use this package's Spanish dictionaries and word lists,
   even when companion packages are attached. Calls through `pseudobibeR.es::`
   do not require `library(pseudobibeR.es)`.

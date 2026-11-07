@@ -54,7 +54,8 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
     block_negation_es(
       tokens, doc_ids,
       normalize_terms(get_word_list(word_lists, "neg_synthetic_determiners")),
-      neg_terms, neg_adverbs
+      neg_terms, neg_adverbs,
+      nominal_no_modifiers = get_word_list(word_lists, "neg_nominal_no_modifiers")
     )
   )
   evidence <- do.call(bind_evidence, lapply(blocks, extract_evidence))
@@ -76,6 +77,7 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
   evidence <- bind_evidence(evidence, lexical$evidence)
   evidence <- dplyr::distinct(evidence, .data$doc_id, .data$feature,
                               .data$sentence_id, .data$token_id, .keep_all = TRUE)
+  evidence <- exclude_specialized_adverbs(evidence, lexical$spans)
 
   counts <- doc_ids
   for (feature in .evidence_features) {
@@ -95,21 +97,30 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
     counts <- normalize_counts(counts)
   }
   if (measure != "none") {
-    document_tokens <- quanteda::as.tokens(split(
-      tokens$token, match(tokens$doc_id, doc_ids$doc_id)
-    ))
+    document_tokens <- lexical_diversity_tokens(tokens, doc_ids)
+    lengths <- quanteda::ntoken(document_tokens)
+    nonempty <- lengths > 0L
+    if (any(!nonempty)) {
+      warning(
+        "Documents with no lexical-diversity tokens have undefined lexical diversity: ",
+        paste(doc_ids$doc_id[!nonempty], collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
     actual <- measure
-    if (measure == "MATTR" && any(quanteda::ntoken(document_tokens) < 200L)) {
+    if (measure == "MATTR" && any(lengths < 200L)) {
       message("Setting type-to-token ratio to TTR")
       actual <- "TTR"
     }
-    lexdiv <- quanteda.textstats::textstat_lexdiv(
-      document_tokens, measure = actual,
-      remove_punct = FALSE, remove_numbers = FALSE, remove_symbols = FALSE
-    )
-    counts$f_43_type_token <- lexdiv[[actual]][
-      match(as.character(seq_len(nrow(doc_ids))), lexdiv$document)
-    ]
+    counts$f_43_type_token <- rep(NA_real_, nrow(doc_ids))
+    if (any(nonempty)) {
+      lexdiv <- quanteda.textstats::textstat_lexdiv(
+        document_tokens[nonempty], measure = actual
+      )
+      counts$f_43_type_token[nonempty] <- lexdiv[[actual]][
+        match(as.character(which(nonempty)), lexdiv$document)
+      ]
+    }
   }
   counts <- counts[, c("doc_id", intersect(names(.feature_categories), names(counts)),
                        "n_tokens", "n_lex_tokens")]

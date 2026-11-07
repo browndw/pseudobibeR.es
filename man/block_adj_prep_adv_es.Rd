@@ -30,6 +30,7 @@ Data frame: one row per doc, columns f_39 - f_42
 f_39  ADP tokens, with inventoried prepositional phrases counted once
 f_40  Attributive adjectives and their conjuncts, with nonpredicative fallback
 f_41  Predicative adjectives and their conjuncts (xcomp/acomp/cop target/attr)
-f_42  All ADV tokens, including overlap with other adverbial features
+f_42  ADV candidates; the final pipeline excludes occurrences counted as
+place/time adverbials, downtoners, hedges, or amplifiers
 }
 \keyword{internal}

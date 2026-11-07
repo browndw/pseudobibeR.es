@@ -56,10 +56,9 @@ test_that("LIMITACIÓN documentada: 'se' argumental no es separable de la pasiva
   expect_equal(as.numeric(r$f_06_first_person_pronouns), 0)
 })
 
-test_that("f_42 cuenta TODOS los adverbios, con solapamientos deliberados", {
+test_that("f_42 excluye tiempo pero conserva adverbios negativos y de modo", {
   skip_if_not_installed("udpipe")
-  # 'no' (also f_67), 'rápidamente', 'hoy' (also f_05): all three in f_42.
-  expect_equal(feat_count("No corre rápidamente hoy.", "f_42_adverbs"), 3)
+  expect_equal(feat_count("No corre rápidamente hoy.", "f_42_adverbs"), 2)
 })
 
 # nolint end

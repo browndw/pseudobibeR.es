@@ -15,7 +15,7 @@
 # LINGUISTIC NOTE -- Spanish negation:
 #
 #   f_66 counts configured negative words, including negative concord with no.
-#   f_67 counts no as ADV/PART attached to a verb, adjective or adverb.
+#   f_67 counts scoped ADV/PART no, with guarded non-negation exclusions.
 #   Negative words and no intentionally remain separate occurrences.
 
 # -----------------------------------------------------------------------------
@@ -242,88 +242,154 @@ block_split_coordination_es <- function(tokens, doc_ids, token_lookup,
 # 4.  block_negation_es   f_66-f_67
 # -----------------------------------------------------------------------------
 
+analytic_negation_rows <- function(tokens, negation_terms, nominal_no_modifiers) {
+  context <- tokens %>%
+    dplyr::group_by(.data$doc_id, .data$sentence_id) %>%
+    dplyr::mutate(
+      neg_prev_pos = dplyr::lag(.data$pos),
+      neg_prev_lemma = dplyr::lag(.data$lemma),
+      neg_prev2_pos = dplyr::lag(.data$pos, 2L),
+      neg_prev_token = dplyr::lag(.data$token),
+      neg_next_token = dplyr::lead(.data$token),
+      neg_next_pos = dplyr::lead(.data$pos)
+    ) %>%
+    dplyr::ungroup()
+  heads <- tokens %>%
+    dplyr::transmute(
+      doc_id = .data$doc_id, sentence_id = .data$sentence_id,
+      head_token_id_int = .data$token_id_int,
+      neg_head_pos = .data$pos, neg_head_lemma = .data$lemma,
+      neg_head_dep_rel = .data$dep_rel
+    )
+  candidates <- context %>%
+    dplyr::filter(
+      .data$lemma %in% negation_terms, .data$pos %in% c("ADV", "PART"),
+      .data$dep_rel %in% c("advmod", "neg"),
+      .data$head_token_id_int > 0L,
+      .data$head_token_id_int != .data$token_id_int
+    ) %>%
+    dplyr::inner_join(
+      heads, by = c("doc_id", "sentence_id", "head_token_id_int"),
+      relationship = "many-to-one"
+    ) %>%
+    dplyr::filter(
+      !is.na(.data$neg_head_pos),
+      !.data$neg_head_pos %in% c("", "PUNCT", "SYM", "SPACE"),
+      !(.data$neg_head_lemma %in% negation_terms &
+          .data$neg_head_pos %in% c("ADV", "PART"))
+    )
+
+  matches <- surface_matches(tokens, "no_obstante")
+  candidates <- candidates %>%
+    dplyr::anti_join(
+      tokens[matches$start_row, ],
+      by = c("doc_id", "sentence_id", "token_id_int")
+    )
+
+  modifiers <- normalize_terms(nominal_no_modifiers)
+  article_before <- candidates$neg_prev_pos == "DET" |
+    (candidates$neg_prev_lemma %in% modifiers & candidates$neg_prev2_pos == "DET")
+  # Guard noun readings without suppressing la no violencia or un no fumador.
+  nominal <- article_before & (
+    (candidates$neg_next_pos == "ADP" & candidates$neg_head_pos %in% c("NOUN", "PROPN")) |
+      (candidates$neg_head_pos == "ADJ" & candidates$neg_head_lemma %in% modifiers &
+         candidates$neg_head_dep_rel != "amod")
+  )
+  article_heads <- tokens %>%
+    dplyr::filter(.data$pos == "DET") %>%
+    dplyr::transmute(
+      doc_id = .data$doc_id, sentence_id = .data$sentence_id,
+      article_id = .data$token_id_int, token_id_int = .data$head_token_id_int
+    )
+  nominal_heads <- candidates %>%
+    dplyr::inner_join(
+      article_heads, by = c("doc_id", "sentence_id", "token_id_int"),
+      relationship = "many-to-many"
+    ) %>%
+    dplyr::filter(.data$token_id_int > .data$article_id)
+  opening <- c("\"", "'", "\u00ab", "\u201c", "\u2018")
+  closing <- c("\"", "'", "\u00bb", "\u201d", "\u2019")
+  quoted <- candidates$neg_next_token ==
+    closing[match(candidates$neg_prev_token, opening)]
+  candidates <- candidates[
+    !dplyr::coalesce(nominal | quoted, FALSE), ] %>%
+    dplyr::anti_join(nominal_heads, by = c("doc_id", "sentence_id", "token_id_int"))
+
+  commas <- tokens %>%
+    dplyr::filter(.data$token == ",", .data$pos == "PUNCT") %>%
+    dplyr::transmute(
+      doc_id = .data$doc_id, sentence_id = .data$sentence_id,
+      comma_id = .data$token_id_int
+    )
+  comma_counts <- candidates %>%
+    dplyr::inner_join(
+      commas,
+      by = dplyr::join_by("doc_id", "sentence_id",
+                          "token_id_int" < "comma_id", "head_token_id_int" > "comma_id"),
+      relationship = "many-to-many"
+    ) %>%
+    dplyr::count(.data$doc_id, .data$sentence_id, .data$token_id_int,
+                 name = "neg_comma_count")
+  later <- candidates %>%
+    dplyr::transmute(
+      doc_id = .data$doc_id, sentence_id = .data$sentence_id,
+      head_token_id_int = .data$head_token_id_int, later_id = .data$token_id_int
+    )
+  repeated_prefixes <- candidates %>%
+    dplyr::filter(.data$neg_next_token == ",") %>%
+    dplyr::semi_join(
+      later,
+      by = dplyr::join_by("doc_id", "sentence_id", "head_token_id_int",
+                          "token_id_int" < "later_id")
+    )
+  # A reply prefix differs from a negator interrupted by a comma-delimited aside.
+  candidates %>%
+    dplyr::left_join(
+      comma_counts, by = c("doc_id", "sentence_id", "token_id_int"),
+      relationship = "many-to-one"
+    ) %>%
+    dplyr::filter(!dplyr::coalesce(
+      .data$neg_next_token == "," & .data$neg_comma_count == 1L, FALSE
+    )) %>%
+    dplyr::anti_join(repeated_prefixes, by = c("doc_id", "sentence_id", "token_id_int"))
+}
+
 #' Negation features (Spanish)
 #'
 #' f_66  Palabras negativas, incluso en concordancia con <<no>>
-#' f_67  <<no>> como ADV/PART dependiente de VERB/AUX/ADJ/ADV
+#' f_67  Scoped ADV/PART <<no>>, including nominal, pronominal, numeral,
+#' adjectival, adverbial, and verbal scope. Identifiable reply and noun uses,
+#' quoted standalone <<no>>, and <<no obstante>> are excluded.
 #'
 #' @param tokens Annotated token data frame
 #' @param doc_ids One-column data frame with column `doc_id`
 #' @param neg_synthetic_terms Lemmas de pronombres/adverbios negativos
 #'   (nadie, nada, ninguno, ninguna, nunca, jamas)
 #' @param negation_part_lemmas Lemmas de particulas negativas (no)
-#' @return Data frame with f_66_neg_synthetic, f_67_neg_analytic
+#' @param negation_adverbs Unused compatibility argument.
+#' @param nominal_no_modifiers Adjective lemmas used with an article to
+#'   identify nominalized <<no>>, such as <<un no rotundo>>.
+#' @return Block result with f_66/f_67 counts and token-level evidence.
 #' @keywords internal
 block_negation_es <- function(tokens, doc_ids,
                                neg_synthetic_terms,
                                negation_part_lemmas,
-                               negation_adverbs = NULL) {
+                               negation_adverbs = NULL,
+                               nominal_no_modifiers = get_word_list(
+                                 pseudobibeR.es::word_lists, "neg_nominal_no_modifiers")) {
 
-  # In Spanish, the adverbs "nunca", "jamas", "tampoco" are SYNTHETIC
-  # negation according to Biber (1985) and biber_espanol_completo.md F_66, not
-  # analytic. We add them to the list to detect them in f_66.
+  # Retain the existing f_66 inventory pending the shared mapping decision.
   neg_synthetic_terms <- unique(c(
     neg_synthetic_terms,
     "nunca", "jam\u00e1s", "jamas", "tampoco"
   ))
 
-  # -- Helper table of analytically negated heads ----------------------------
-  # Columns: doc_id, sentence_id, neg_head_id
-  # HERNAN REVIEW (Phase 5): f_67 is extended beyond placement before the
-  # verb. 'no' as a focus adverb on other constituents also counts:
-  # 'una respuesta no definitiva' (ADJ head), 'no muy lejos' (ADV head). The
-  # Source POS and dependency filters exclude nouns and independent answers.
-  verb_pos <- c("VERB", "AUX", "ADJ", "ADV")
-
-  analytic_heads <- tokens %>%
-    dplyr::filter(
-      .data$lemma %in% negation_part_lemmas,
-      .data$pos %in% c("ADV", "PART"),
-      .data$dep_rel %in% c("advmod", "neg"),
-      !is.na(.data$head_token_id_int)
-    ) %>%
-    # Check that the head is a verbal, adjectival or adverbial constituent.
-    dplyr::rename(neg_head_id = "head_token_id_int") %>%
-    dplyr::left_join(
-      tokens %>%
-        dplyr::transmute(
-          doc_id2      = .data$doc_id,
-          sentence_id2 = .data$sentence_id,
-          neg_head_id  = .data$token_id_int,
-          head_pos     = .data$pos
-        ),
-      by = c(
-        "doc_id"      = "doc_id2",
-        "sentence_id" = "sentence_id2",
-        "neg_head_id"
-      )
-    ) %>%
-    dplyr::filter(dplyr::coalesce(.data$head_pos, "") %in% verb_pos) %>%
-    dplyr::distinct(.data$doc_id, .data$sentence_id, .data$neg_head_id)
-
-  # -- f_67  Analytic negation -----------------------------------------------
-  # Phase 2l: we restore head_token_id_int (originally renamed to
-  # neg_head_id for the join) so that count_feature_traced can build
-  # evidence with the E1 schema.
-  f67 <- tokens %>%
-    dplyr::filter(
-      .data$lemma %in% negation_part_lemmas,
-      .data$pos %in% c("ADV", "PART"),
-      .data$dep_rel %in% c("advmod", "neg"),
-      !is.na(.data$head_token_id_int)
-    ) %>%
-    dplyr::inner_join(
-      analytic_heads %>%
-        dplyr::rename(head_token_id_int = "neg_head_id"),
-      by = c("doc_id", "sentence_id", "head_token_id_int")
-    ) %>%
+  f67 <- analytic_negation_rows(tokens, negation_part_lemmas, nominal_no_modifiers) %>%
     count_feature_traced("f_67_neg_analytic")
 
   # -- f_66  Synthetic negation ----------------------------------------------
   # Also accept CCONJ for "ni" (UDPipe tags it as a conjunction).
-  # Do not exclude when it co-occurs with preverbal "no": in Spanish
-  # negative concord ("no vino nadie") is obligatory and Biber counts
-  # both elements. biber_espanol_completo.md F_66.
+  # Preserve the existing independent marker counts in negative concord.
   f66 <- tokens %>%
     dplyr::filter(
       .data$lemma %in% neg_synthetic_terms,

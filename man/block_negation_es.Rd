@@ -9,7 +9,9 @@ block_negation_es(
   doc_ids,
   neg_synthetic_terms,
   negation_part_lemmas,
-  negation_adverbs = NULL
+  negation_adverbs = NULL,
+  nominal_no_modifiers = get_word_list(pseudobibeR.es::word_lists,
+    "neg_nominal_no_modifiers")
 )
 }
 \arguments{
@@ -21,12 +23,19 @@ block_negation_es(
 (nadie, nada, ninguno, ninguna, nunca, jamas)}
 
 \item{negation_part_lemmas}{Lemmas de particulas negativas (no)}
+
+\item{negation_adverbs}{Unused compatibility argument.}
+
+\item{nominal_no_modifiers}{Adjective lemmas used with an article to
+identify nominalized <\if{html}{\out{<no>}}>, such as <\if{html}{\out{<un no rotundo>}}>.}
 }
 \value{
-Data frame with f_66_neg_synthetic, f_67_neg_analytic
+Block result with f_66/f_67 counts and token-level evidence.
 }
 \description{
 f_66  Palabras negativas, incluso en concordancia con <\if{html}{\out{<no>}}>
-f_67  <\if{html}{\out{<no>}}> como ADV/PART dependiente de VERB/AUX/ADJ/ADV
+f_67  Scoped ADV/PART <\if{html}{\out{<no>}}>, including nominal, pronominal, numeral,
+adjectival, adverbial, and verbal scope. Identifiable reply and noun uses,
+quoted standalone <\if{html}{\out{<no>}}>, and <\if{html}{\out{<no obstante>}}> are excluded.
 }
 \keyword{internal}
