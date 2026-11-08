@@ -116,8 +116,10 @@ test_that("nonprepositional wh relatives retain subject and object classificatio
   nonrelative$doc_id <- "nonrelative"
   nonrelative$dep_rel[3] <- "ccomp"
   raw <- biber(rbind(subject, object, nonrelative), measure = "none", normalize = FALSE)
-  expect_equal(raw$f_29_that_subj, c(1, 0, 0))
-  expect_equal(raw$f_30_that_obj, c(0, 1, 0))
+  expect_equal(raw$f_29_that_subj, c(0, 0, 0))
+  expect_equal(raw$f_30_that_obj, c(0, 0, 0))
+  expect_equal(raw$f_31_wh_subj, c(1, 0, 0))
+  expect_equal(raw$f_32_wh_obj, c(0, 1, 0))
 })
 test_that("conditional si is not suppressed merely by a communication main verb", {
   conditional <- contract_clause(

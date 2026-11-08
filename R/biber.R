@@ -23,12 +23,65 @@
 #' @return A data frame with one row per document, 67 feature columns
 #'   (66 when `measure = "none"`), and `n_tokens` and `n_lex_tokens`.
 #'   `n_tokens` is the normalization denominator. Lexical tokens are nouns,
-#'   proper nouns, verbs, adjectives, and adverbs. Ten compatibility
-#'   features that are unavailable or merged in Spanish are always zero.
+#'   proper nouns, verbs, adjectives, and adverbs. The compatibility feature
+#'   f_28_present_participle_whiz remains always zero.
 #' @details
 #' Feature identifiers match the English and French companion packages,
-#' but Spanish heuristics are language-specific. Counts depend on the
-#' accuracy of the parser. Integration tests cover UDPipe Spanish-GSD and
+#' but Spanish heuristics are language-specific. `f_09_pronoun_it` counts identified
+#' impersonal predicates, anchored on existing words, not inferred null subjects
+#' or UD empty nodes. Existential haber stays in f_20; personal pro-drop,
+#' generic complements, ambiguous se, and neuter lo are outside the f_09 baseline.
+#' `f_12_proverb_do` counts lexical hacer with action-proform lo (including
+#' enclitics) or lo mismo, not auxiliary/copular, causative, reflexive or overt
+#' nominal-object uses. Bare lo is structurally eligible without semantic
+#' antecedent resolution. Each occurrence is anchored on the supplied verb word;
+#' pronoun/noun counts and token populations remain independent.
+#' `f_15_gerunds` counts clear noun-like nominal infinitives, not all infinitival
+#' subjects. Infinitive/verb identity and nominal internal structure are required;
+#' endings or an article alone are insufficient. Qualifying occurrences are
+#' excluded from f_14, f_16 and f_24 by word identity, without retagging input.
+#' Verbal infinitival clauses remain in f_24 when their source annotations
+#' qualify. Recognized nominal subjects do not license impersonal f_09.
+#' Nominal relatives are partitioned by marker family and role: que in
+#' f_29/f_30, quien/cual forms in f_31/f_32. Pied-piping f_33 takes exclusive
+#' precedence over other relative categories. Explicit roles receive bounded
+#' conflict/agreement checks without retagging; finite appos attachments can be
+#' recovered with relative morphology. Roleless que needs positive predicate
+#' evidence or an external subject, not merely absence of another subject.
+#' Ambiguous role gaps remain unclassified, so a zero can reflect parser limits.
+#' `f_59_contractions` counts recognized colloquial surface reductions, including
+#' native apostrophe splits, once per longest expression with full-span evidence.
+#' Standard al/del, nominal determiner contexts and short nominal acronyms are
+#' excluded. Source POS/lemmas and word populations are not rewritten, even when
+#' models mis-tag reduction fragments or apostrophes.
+#' `f_60_that_deletion` measures bounded complement reduction under creer,
+#' pensar and esperar: infinitival or unmarked finite ccomp/xcomp clauses,
+#' including clear coordination and auxiliary/copular clause-form projection.
+#' Overt introducers, interrogative complements and nominal infinitives are
+#' excluded. Each identified clause head contributes one occurrence, without
+#' reconstructing deleted material or retagging input. Infinitival overlap with
+#' the independent form measure f_24 is intentional. This is not every
+#' infinitive or a claim of register/semantic equivalence across languages.
+#' Missing governor/complement analyses can produce false negatives.
+#' `f_62_split_infinitive` counts adverb-interrupted preposition-infinitive units
+#' once per matched span, requiring a linked verbal infinitive and at least one
+#' non-negative adverb. Negation-only interruptions are excluded; negative ADV/PART
+#' may accompany a qualifying adverb. Consecutive adverbs have no arbitrary
+#' token cap. Subjects, punctuation breaks and nominal infinitives are excluded.
+#' Evidence/audits preserve the full span anchored at its introductory preposition.
+#' Bounded mejor/siquiera lookup supports known mistaggings without retagging;
+#' lost marker attachments can cause misses. f_24/f_63 remain independent.
+#' `f_61_stranded_preposition` measures bounded resumptive prepositional
+#' relatives in Spanish, not literal stranding. Initial hablar-de, depender-de
+#' and confiar-en frames require a nominal que relative, a finite predicate,
+#' separate-subject/first-or-second-person evidence, and a postverbal linked
+#' third-person tonic pronoun PP with no known agreement conflict or bare object.
+#' One occurrence per relative clause retains the first PP span in audits.
+#' Detected resumptive markers leave f_29/f_30; f_33 and other relative bins
+#' are unchanged. Lookup-only first-person preterite recovery for hablar/confiar
+#' uses exact accented forms in word_lists, without rewriting input or metrics.
+#' This is bounded structural evidence, not unrestricted coreference resolution.
+#' Counts depend on parser accuracy. Integration tests cover UDPipe Spanish-GSD and
 #' spaCy `es_core_news_sm`, not general cross-parser equivalence. Native spaCy
 #' root/passive conventions are supported. Tokenization and model errors can
 #' produce different counts and normalization denominators across parsers.

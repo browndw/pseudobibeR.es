@@ -1,16 +1,12 @@
 # features_coordination_negation.R
 # Coordination, split structures, negation, and lexical features (Spanish)
 #
-# FEATURES PRODUCED: f_10, f_14, f_16, f_51 (nouns/demonstratives),
-#                    f_63-f_65 (split aux, coordination),
+# FEATURES PRODUCED: f_10, f_14-f_16, f_51 (nouns/demonstratives),
+#                    f_59 (colloquial contractions/reductions),
+#                    f_62-f_65 (interrupted infinitives, split aux, coordination),
 #                    f_66-f_67 (negation)
 #
-# REMOVED FEATURES (untranslatable):
-#   f_59 (contractions): morphology that does not exist in standard Spanish
-#   f_61 (stranded prepositions): ungrammatical in Spanish
-#   f_62 (split infinitives): requires a preverbal marker "to" that does not exist
-#   f_15 (gerunds as nouns): the Spanish gerund is not nominal
-# See biber_espanol_completo.md for the full justification.
+# f_61 resumptive prepositional relatives are detected in features_subordination.R.
 #
 # LINGUISTIC NOTE -- Spanish negation:
 #
@@ -18,13 +14,157 @@
 #   f_67 counts scoped ADV/PART no, with guarded non-negation exclusions.
 #   Negative words and no intentionally remain separate occurrences.
 
-# -----------------------------------------------------------------------------
-# Features f_59 (contractions), f_61 (stranded preposition) and f_62 (split
-# infinitive) REMOVED as untranslatable (biber_espanol_completo.md §F_59,
-# §F_61, §F_62). There used to be stubs block_contractions_es /
-# block_stranded_split_es that returned doc_ids without columns; removed in
-# the Phase 1 audit (Section C2) as vestigial code.
-# -----------------------------------------------------------------------------
+colloquial_contraction_patterns <- function(forms) {
+  forms <- stringr::str_replace_all(forms, "\u2019", "'")
+  unique(unlist(lapply(forms, function(form) {
+    parts <- stringr::str_extract_all(form, "[^']+|'")[[1L]]
+    if (length(parts) < 2L) return(form)
+    boundaries <- expand.grid(
+      rep(list(c(FALSE, TRUE)), length(parts) - 1L),
+      KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE
+    )
+    vapply(seq_len(nrow(boundaries)), function(i) {
+      separators <- c(ifelse(unlist(boundaries[i, ], use.names = FALSE), " ", ""), "")
+      paste0(parts, separators, collapse = "")
+    }, character(1))
+  }), use.names = FALSE))
+}
+
+#' Colloquial contractions and written reductions (Spanish)
+#'
+#' Recognized surface expressions count once across native apostrophe splits.
+#' Ordinary al/del, nominal uses and short nominal acronyms are excluded.
+#' Lookup-only apostrophe normalization does not change supplied annotations.
+#'
+#' @param tokens Prepared annotated token data frame
+#' @param doc_ids One-column data frame with column doc_id
+#' @param forms Inventory of recognized written reductions
+#' @return A block result with f_59 counts and full-span E1 evidence
+#' @keywords internal
+block_contractions_es <- function(tokens, doc_ids, forms) {
+  patterns <- colloquial_contraction_patterns(forms)
+  lookup <- tokens
+  lookup$token <- stringr::str_replace_all(lookup$token, "\u2019", "'")
+  starts <- unique(vapply(strsplit(patterns, " ", fixed = TRUE), `[`, character(1), 1L))
+  starts <- starts[stringr::str_detect(starts, "[[:alpha:]]")]
+  if (!any(lookup$token %in% starts)) {
+    return(make_block_result(dplyr::mutate(doc_ids, f_59_contractions = 0L)))
+  }
+  hits <- surface_matches(lookup, patterns)
+  nominal_heads <- determiner_dependencies(tokens) %>%
+    dplyr::filter(
+      .data$article_id < .data$token_id_int,
+      stringr::str_detect(dplyr::coalesce(.data$determiner_dep_rel, ""), "^det($|:)")
+    )
+  nominal_rows <- tokens %>%
+    dplyr::mutate(.row_id = seq_len(nrow(tokens))) %>%
+    dplyr::semi_join(nominal_heads, by = c("doc_id", "sentence_id", "token_id_int")) %>%
+    dplyr::pull(".row_id")
+  acronym <- stringr::str_detect(tokens$surface, "^[A-Z]{2,3}$") &
+    tokens$pos %in% c("NOUN", "PROPN", "SYM", "X")
+  keep <- vapply(seq_len(nrow(hits)), function(i) {
+    span <- seq.int(hits$start_row[i], hits$end_row[i])
+    apostrophe <- any(grepl("'", lookup$token[span], fixed = TRUE))
+    !any(span %in% nominal_rows) && (apostrophe || !any(acronym[span]))
+  }, logical(1))
+  hits <- hits[keep, , drop = FALSE]
+  hits <- hits[order(hits$start_row, hits$end_row), , drop = FALSE]
+  rows <- tokens[hits$start_row, ]
+  rows$token <- vapply(seq_len(nrow(hits)), function(i) {
+    paste(tokens$token[seq.int(hits$start_row[i], hits$end_row[i])], collapse = " ")
+  }, character(1))
+  f59 <- count_feature_traced(rows, "f_59_contractions")
+  counts <- doc_ids %>%
+    dplyr::left_join(f59$counts, by = "doc_id") %>%
+    dplyr::mutate(f_59_contractions = dplyr::coalesce(.data$f_59_contractions, 0L))
+  make_block_result(counts, f59$evidence)
+}
+
+#' Adverb-interrupted preposition-infinitive units (Spanish f_62)
+#'
+#' Counts one full matched span with a genuine non-negative adverb between an
+#' introductory preposition and a verbal infinitive. Negation-only interruptions
+#' are excluded; negative ADV/PART may accompany a qualifying adverb.
+#'
+#' @param tokens Prepared annotated token data frame
+#' @param doc_ids One-column data frame with document identifiers
+#' @param negative_terms Existing lexical negation inventory
+#' @param adverb_fallbacks Bounded inventory for known adverb mistaggings
+#' @param nominal_infinitives Shared noun-like infinitive occurrence rows
+#' @return Block result with f_62 counts and full-span evidence
+#' @keywords internal
+block_interrupted_infinitives_es <- function(tokens, doc_ids, negative_terms,
+                                             adverb_fallbacks, nominal_infinitives) {
+  keys <- c("doc_id", "sentence_id", "token_id_int")
+  infinitives <- tokens %>%
+    dplyr::mutate(.row_id = seq_len(nrow(tokens))) %>%
+    dplyr::filter(.data$pos %in% c("VERB", "AUX"), .data$morph_verbform == "Inf") %>%
+    dplyr::anti_join(nominal_infinitives, by = keys) %>%
+    dplyr::pull(".row_id")
+  negative <- tokens$lemma %in% negative_terms | tokens$token %in% negative_terms
+  fallback <- (tokens$lemma %in% adverb_fallbacks | tokens$token %in% adverb_fallbacks) &
+    tokens$pos %in% c("ADJ", "NOUN", "PROPN") &
+    dplyr::coalesce(tokens$dep_rel, "") %in% c("advmod", "fixed")
+  adverb <- tokens$pos %in% "ADV" | fallback
+  filler <- adverb | (tokens$pos %in% "PART" & negative)
+  starts <- ends <- integer()
+  for (group in dplyr::group_rows(dplyr::group_by(tokens, .data$doc_id, .data$sentence_id))) {
+    for (end in which(group %in% infinitives)) {
+      start <- end - 1L
+      while (start >= 1L && filler[group[start]]) start <- start - 1L
+      if (start < 1L || start == end - 1L) next
+      modifiers <- group[seq.int(start + 1L, end - 1L)]
+      if (!any(adverb[modifiers] & !negative[modifiers])) next
+      first <- group[start]
+      last <- group[end]
+      if (!tokens$pos[first] %in% "ADP") next
+      targets <- tokens$token_id_int[last]
+      if (stringr::str_detect(dplyr::coalesce(tokens$dep_rel[last], ""),
+                             "^(aux|cop)($|:)")) {
+        targets <- c(targets, tokens$head_token_id_int[last])
+      }
+      relation <- dplyr::coalesce(tokens$dep_rel[first], "")
+      parent <- group[match(tokens$head_token_id_int[first], tokens$token_id_int[group])]
+      linked <- relation %in% c("mark", "case") &&
+        tokens$head_token_id_int[first] %in% targets
+      if (!linked && relation %in% c("mark", "case")) {
+        head <- tokens$head_token_id_int[first]
+        for (step in seq_along(modifiers)) {
+          intermediate <- group[match(head, tokens$token_id_int[group])]
+          if (is.na(intermediate) || !intermediate %in% modifiers ||
+              dplyr::coalesce(tokens$dep_rel[intermediate], "") != "advmod") break
+          head <- tokens$head_token_id_int[intermediate]
+          if (head %in% targets) {
+            linked <- TRUE
+            break
+          }
+        }
+      }
+      if (!is.na(parent)) {
+        # GSD can use fixed inside an introductory marker such as vamos a.
+        linked <- linked ||
+          (relation == "fixed" &&
+             dplyr::coalesce(tokens$dep_rel[parent], "") %in% c("mark", "case") &&
+             tokens$head_token_id_int[parent] %in% targets)
+      }
+      if (!linked) next
+      starts <- c(starts, first)
+      ends <- c(ends, last)
+    }
+  }
+  hit_order <- order(starts, ends)
+  starts <- starts[hit_order]
+  ends <- ends[hit_order]
+  rows <- tokens[starts, ]
+  rows$token <- vapply(seq_along(starts), function(i) {
+    paste(tokens$token[seq.int(starts[i], ends[i])], collapse = " ")
+  }, character(1))
+  traced <- count_feature_traced(rows, "f_62_split_infinitive")
+  counts <- doc_ids %>%
+    dplyr::left_join(traced$counts, by = "doc_id") %>%
+    dplyr::mutate(f_62_split_infinitive = dplyr::coalesce(.data$f_62_split_infinitive, 0L))
+  make_block_result(counts, traced$evidence)
+}
 
 # -----------------------------------------------------------------------------
 # 1.  block_split_coordination_es   f_63-f_65
@@ -242,6 +382,57 @@ block_split_coordination_es <- function(tokens, doc_ids, token_lookup,
 # 4.  block_negation_es   f_66-f_67
 # -----------------------------------------------------------------------------
 
+determiner_dependencies <- function(tokens) {
+  tokens %>%
+    dplyr::filter(.data$pos == "DET") %>%
+    dplyr::transmute(
+      doc_id = .data$doc_id, sentence_id = .data$sentence_id,
+      article_id = .data$token_id_int, token_id_int = .data$head_token_id_int,
+      determiner_lemma = .data$lemma, determiner_feats = .data$feats,
+      determiner_dep_rel = .data$dep_rel
+    )
+}
+
+synthetic_negation_rows <- function(tokens, negation_terms) {
+  predicates <- tokens %>%
+    dplyr::filter(.data$pos %in% c("VERB", "AUX")) %>%
+    dplyr::transmute(
+      doc_id = .data$doc_id, sentence_id = .data$sentence_id,
+      head_token_id_int = .data$token_id_int
+    )
+  # Recover the observed spaCy PROPN subject error without retagging any tokens.
+  recovered <- tokens %>%
+    dplyr::filter(
+      .data$lemma %in% negation_terms, .data$lemma == "nadie", .data$pos == "PROPN",
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^nsubj($|:)")
+    ) %>%
+    dplyr::semi_join(predicates, by = c("doc_id", "sentence_id", "head_token_id_int"))
+  candidates <- tokens %>%
+    dplyr::filter(
+      .data$lemma %in% negation_terms,
+      .data$pos %in% c("PRON", "ADV", "DET", "CCONJ")
+    ) %>%
+    dplyr::bind_rows(recovered)
+
+  articles <- determiner_dependencies(tokens) %>%
+    dplyr::filter(
+      stringr::str_detect(dplyr::coalesce(.data$determiner_dep_rel, ""), "^det($|:)"),
+      .data$determiner_lemma %in% c("el", "la", "los", "las", "un", "uno", "una",
+                                   "unos", "unas") |
+        stringr::str_detect(dplyr::coalesce(.data$determiner_feats, ""),
+                            "(^|\\|)PronType=Art(\\||$)")
+    )
+  nominal <- candidates %>%
+    dplyr::inner_join(
+      articles, by = c("doc_id", "sentence_id", "token_id_int"),
+      relationship = "many-to-many"
+    ) %>%
+    dplyr::filter(.data$article_id < .data$token_id_int)
+  tokens %>%
+    dplyr::semi_join(candidates, by = c("doc_id", "sentence_id", "token_id_int")) %>%
+    dplyr::anti_join(nominal, by = c("doc_id", "sentence_id", "token_id_int"))
+}
+
 analytic_negation_rows <- function(tokens, negation_terms, nominal_no_modifiers) {
   context <- tokens %>%
     dplyr::group_by(.data$doc_id, .data$sentence_id) %>%
@@ -295,12 +486,7 @@ analytic_negation_rows <- function(tokens, negation_terms, nominal_no_modifiers)
       (candidates$neg_head_pos == "ADJ" & candidates$neg_head_lemma %in% modifiers &
          candidates$neg_head_dep_rel != "amod")
   )
-  article_heads <- tokens %>%
-    dplyr::filter(.data$pos == "DET") %>%
-    dplyr::transmute(
-      doc_id = .data$doc_id, sentence_id = .data$sentence_id,
-      article_id = .data$token_id_int, token_id_int = .data$head_token_id_int
-    )
+  article_heads <- determiner_dependencies(tokens)
   nominal_heads <- candidates %>%
     dplyr::inner_join(
       article_heads, by = c("doc_id", "sentence_id", "token_id_int"),
@@ -356,15 +542,17 @@ analytic_negation_rows <- function(tokens, negation_terms, nominal_no_modifiers)
 
 #' Negation features (Spanish)
 #'
-#' f_66  Palabras negativas, incluso en concordancia con <<no>>
+#' f_66  Negative lexical word occurrences, including concord with <<no>>.
+#'   Ordinary nominal uses with a preceding dependent article are excluded.
+#'   A guarded fallback accepts verbal-subject <<nadie>> mis-tagged PROPN.
 #' f_67  Scoped ADV/PART <<no>>, including nominal, pronominal, numeral,
 #' adjectival, adverbial, and verbal scope. Identifiable reply and noun uses,
 #' quoted standalone <<no>>, and <<no obstante>> are excluded.
 #'
 #' @param tokens Annotated token data frame
 #' @param doc_ids One-column data frame with column `doc_id`
-#' @param neg_synthetic_terms Lemmas de pronombres/adverbios negativos
-#'   (nadie, nada, ninguno, ninguna, nunca, jamas)
+#' @param neg_synthetic_terms Negative determiner, pronoun, adverb, and
+#'   coordinator lemmas (ninguno, nadie, nada, nunca, jamas, tampoco, ni).
 #' @param negation_part_lemmas Lemmas de particulas negativas (no)
 #' @param negation_adverbs Unused compatibility argument.
 #' @param nominal_no_modifiers Adjective lemmas used with an article to
@@ -378,7 +566,7 @@ block_negation_es <- function(tokens, doc_ids,
                                nominal_no_modifiers = get_word_list(
                                  pseudobibeR.es::word_lists, "neg_nominal_no_modifiers")) {
 
-  # Retain the existing f_66 inventory pending the shared mapping decision.
+  # Retain the approved lexical inventory and per-word concord counts.
   neg_synthetic_terms <- unique(c(
     neg_synthetic_terms,
     "nunca", "jam\u00e1s", "jamas", "tampoco"
@@ -387,14 +575,7 @@ block_negation_es <- function(tokens, doc_ids,
   f67 <- analytic_negation_rows(tokens, negation_part_lemmas, nominal_no_modifiers) %>%
     count_feature_traced("f_67_neg_analytic")
 
-  # -- f_66  Synthetic negation ----------------------------------------------
-  # Also accept CCONJ for "ni" (UDPipe tags it as a conjunction).
-  # Preserve the existing independent marker counts in negative concord.
-  f66 <- tokens %>%
-    dplyr::filter(
-      .data$lemma %in% neg_synthetic_terms,
-      .data$pos %in% c("PRON", "ADV", "DET", "CCONJ")
-    ) %>%
+  f66 <- synthetic_negation_rows(tokens, neg_synthetic_terms) %>%
     count_feature_traced("f_66_neg_synthetic")
 
   counts <- doc_ids %>%
@@ -415,19 +596,17 @@ block_negation_es <- function(tokens, doc_ids,
 #'
 #' f_10  Pronombres demostrativos (este, ese, aquel + formas)
 #' f_14  Nominalizaciones (sustantivos con sufijos productivos)
-#' f_15  ELIMINADO (intraducible): el gerundio espanol no funciona como
-#'       sustantivo; las funciones nominales del -ing ingles se realizan
-#'       mediante infinitivos (f_24) y nominalizaciones (f_14).
-#'       biber_espanol_completo.md sec. F_15.
-#' f_16  Otros sustantivos (= total NOUN/PROPN - f_14; sin resta de f_15)
+#' f_15  Infinitivos claramente sustantivados
+#' f_16  Otros sustantivos (excluye ocurrencias de f_14 y f_15)
 #' f_51  Demostrativos determinantes (mismo este/ese/aquel en funcion DET)
 #'
 #' @param tokens Annotated token data frame
 #' @param doc_ids One-column data frame with column `doc_id`
 #' @param word_lists_lookup Word lists lookup
-#' @return Data frame with f_10, f_14, f_16, f_51
+#' @param nominal_infinitives Shared noun-like infinitive rows
+#' @return Block result with f_10, f_14-f_16, f_51
 #' @keywords internal
-block_lexical_membership_es <- function(tokens, doc_ids, word_lists_lookup) {
+block_lexical_membership_es <- function(tokens, doc_ids, word_lists_lookup, nominal_infinitives) {
 
   # 2026-04-20: pronoun_matchlist does not contain demonstratives (este/ese/aquel).
   # demonstrative_matchlist (added in word_lists.yaml) is loaded for f_10 and f_51.
@@ -439,7 +618,6 @@ block_lexical_membership_es <- function(tokens, doc_ids, word_lists_lookup) {
   nominalization_stop   <- normalize_terms(
     get_word_list(word_lists_lookup, "nominalization_stoplist")
   )
-  # gerund_stop removed: f_15 is untranslatable, the Spanish gerund is not nominal.
 
   # -- f_10  Demonstrative pronouns ------------------------------------------
   # 2026-04-20: changed from pronoun_terms to demonstr_terms.
@@ -481,6 +659,7 @@ block_lexical_membership_es <- function(tokens, doc_ids, word_lists_lookup) {
   # excludes them via anti_join to avoid subtracting from the count afterwards).
   f14_rows <- tokens %>%
     dplyr::filter(.data$pos == "NOUN") %>%
+    dplyr::anti_join(nominal_infinitives, by = c("doc_id", "sentence_id", "token_id_int")) %>%
     dplyr::mutate(lem_lower = stringr::str_to_lower(.data$lemma)) %>%
     dplyr::filter(
       stringr::str_detect(.data$lem_lower, sfx_pat),
@@ -490,15 +669,15 @@ block_lexical_membership_es <- function(tokens, doc_ids, word_lists_lookup) {
 
   f14 <- count_feature_traced(f14_rows, "f_14_nominalizations")
 
-  # f_15 (gerunds) REMOVED: untranslatable.
+  f15 <- count_feature_traced(nominal_infinitives, "f_15_gerunds")
 
   # -- f_16  Other nouns -----------------------------------------------------
-  # In the legacy code this was computed as (total NOUN/PROPN) - f_14. To
-  # preserve the invariant count == nrow(evidence), here we anti-join the
-  # f_14 tokens before counting; the numeric result is identical.
   f16_rows <- tokens %>%
     dplyr::filter(
       .data$pos %in% c("NOUN", "PROPN")
+    ) %>%
+    dplyr::anti_join(
+      nominal_infinitives, by = c("doc_id", "sentence_id", "token_id_int")
     ) %>%
     dplyr::anti_join(
       f14_rows %>% dplyr::select("doc_id", "sentence_id", "token_id_int"),
@@ -510,10 +689,103 @@ block_lexical_membership_es <- function(tokens, doc_ids, word_lists_lookup) {
     dplyr::left_join(f10$counts,  by = "doc_id") %>%
     dplyr::left_join(f51$counts,  by = "doc_id") %>%
     dplyr::left_join(f14$counts,  by = "doc_id") %>%
+    dplyr::left_join(f15$counts,  by = "doc_id") %>%
     dplyr::left_join(f16$counts,  by = "doc_id") %>%
     dplyr::mutate(
       dplyr::across(-dplyr::any_of("doc_id"), ~ dplyr::coalesce(., 0L))
     )
-  evidence <- bind_evidence(f10$evidence, f51$evidence, f14$evidence, f16$evidence)
+  evidence <- bind_evidence(f10$evidence, f51$evidence, f14$evidence, f15$evidence, f16$evidence)
   make_block_result(counts = counts, evidence = evidence)
+}
+
+#' @keywords internal
+#' @noRd
+nominal_infinitive_rows <- function(tokens, word_lists_lookup, dict_lookup) {
+  keys <- c("doc_id", "sentence_id", "token_id_int")
+  heads <- function(rows) {
+    dplyr::distinct(rows, .data$doc_id, .data$sentence_id,
+                    token_id_int = .data$head_token_id_int)
+  }
+  verb_features <- c(
+    "f_52_modal_possibility", "f_53_modal_necessity", "f_55_verb_public",
+    "f_56_verb_private", "f_57_verb_suasive", "f_58_verb_seem"
+  )
+  known_infinitives <- normalize_terms(c(
+    get_word_list(word_lists_lookup, "nominal_infinitive_lemmas"),
+    get_word_list(word_lists_lookup, "impersonal_verbs"),
+    get_word_list(word_lists_lookup, "linking_matchlist"),
+    unlist(lapply(verb_features, function(feature) {
+      dictionary_to_lemmas(dict_lookup, feature, head_word = TRUE)
+    }), use.names = FALSE)
+  ))
+  infinitive_pattern <- "(ar|er|ir|\u00edr)$"
+  candidates <- tokens %>%
+    dplyr::filter(
+      .data$pos %in% c("VERB", "AUX", "NOUN", "PROPN"),
+      stringr::str_detect(.data$token, infinitive_pattern),
+      is.na(.data$morph_verbform) | .data$morph_verbform == "Inf",
+      !stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(aux|cop)($|:)"),
+      .data$pos %in% c("VERB", "AUX") | .data$morph_verbform == "Inf" |
+        .data$token %in% known_infinitives | .data$lemma %in% known_infinitives
+    )
+  nominal_markers <- tokens %>%
+    dplyr::filter(
+      (.data$pos == "DET" &
+         stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^det($|:)")) |
+        (.data$pos == "ADJ" & .data$dep_rel == "amod")
+    )
+  genitive_heads <- tokens %>%
+    dplyr::filter(.data$pos == "ADP", .data$dep_rel == "case",
+                  .data$lemma %in% c("de", "del") | .data$token %in% c("de", "del")) %>%
+    heads()
+  objects <- tokens %>%
+    dplyr::filter(stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(obj|iobj)($|:)")) %>%
+    dplyr::anti_join(genitive_heads, by = keys)
+  copular_heads <- heads(tokens %>% dplyr::filter(.data$dep_rel == "cop"))
+  subjects <- tokens %>%
+    dplyr::filter(stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(nsubj|csubj)($|:)")) %>%
+    dplyr::anti_join(copular_heads, by = c(
+      "doc_id", "sentence_id", "head_token_id_int" = "token_id_int"
+    ))
+  verbal_dependents <- tokens %>%
+    dplyr::filter(
+      (.data$pos == "ADV" & .data$dep_rel == "advmod") |
+        (.data$pos %in% c("VERB", "AUX") &
+           stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(aux|ccomp|xcomp)($|:)"))
+    )
+  excluded <- heads(dplyr::bind_rows(objects, subjects, verbal_dependents))
+  coordinands <- candidates %>%
+    dplyr::filter(.data$dep_rel == "conj") %>%
+    dplyr::semi_join(candidates, by = c(
+      "doc_id", "sentence_id", "head_token_id_int" = "token_id_int"
+    ))
+  # Verbal structure on either coordinand makes the coordinated group verbal.
+  repeat {
+    children <- coordinands %>%
+      dplyr::semi_join(excluded, by = c(
+        "doc_id", "sentence_id", "head_token_id_int" = "token_id_int"
+      )) %>%
+      dplyr::select(dplyr::all_of(keys))
+    parents <- heads(dplyr::semi_join(coordinands, excluded, by = keys))
+    new_excluded <- dplyr::bind_rows(children, parents) %>%
+      dplyr::distinct() %>%
+      dplyr::anti_join(excluded, by = keys)
+    if (!nrow(new_excluded)) break
+    excluded <- dplyr::bind_rows(excluded, new_excluded)
+  }
+  eligible <- dplyr::anti_join(candidates, excluded, by = keys)
+  nominal <- dplyr::semi_join(eligible, heads(nominal_markers), by = keys) %>%
+    dplyr::select(dplyr::all_of(keys))
+  repeat {
+    shared <- coordinands %>%
+      dplyr::semi_join(nominal, by = c(
+        "doc_id", "sentence_id", "head_token_id_int" = "token_id_int"
+      )) %>%
+      dplyr::semi_join(eligible, by = keys) %>%
+      dplyr::select(dplyr::all_of(keys)) %>%
+      dplyr::anti_join(nominal, by = keys)
+    if (!nrow(shared)) break
+    nominal <- dplyr::bind_rows(nominal, shared)
+  }
+  dplyr::semi_join(tokens, nominal, by = keys)
 }

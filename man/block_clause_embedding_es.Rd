@@ -27,9 +27,4 @@ f_36  Subordinada concesiva (solo: aunque)
 f_37  Subordinada condicional (si, a_menos_que, salvo_que)
 f_38  Otros subordinadores adverbiales (cuando, mientras, antes_de_que?)
 }
-\details{
-f_60 (that-deletion) ELIMINADO: intraducible. En espanol el complementante
-<\if{html}{\out{<que>}}> es practicamente obligatorio; su omision es agramatical.
-biber_espanol_completo.md sec. F_60.
-}
 \keyword{internal}

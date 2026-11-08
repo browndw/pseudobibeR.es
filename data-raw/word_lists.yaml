@@ -145,13 +145,8 @@ reflexive_clitic_matchlist:
   - os
 
 proverb_object_pronouns:
-  # Cliticos de objeto directo/indirecto usados con hacer como pro-verbo
+  # Proforma de accion; no incluye cliticos nominales ni dativos.
   - lo
-  - la
-  - los
-  - las
-  - le
-  - les
 
 # ---------------------------------------------------------------------------
 # VERBOS COPULATIVOS / IMPERSONALES
@@ -170,6 +165,86 @@ impersonal_verbs:
   - haber    # hay, habia, hubo, habra, etc.
   - hacer    # hace_frio, hace_calor, hace_tiempo
   - ser      # es tarde, era de noche
+
+# Narrow inventories for predicate-based f_09; the mixed list above is not used.
+impersonal_weather_verbs:
+  - llover
+  - nevar
+  - granizar
+  - tronar
+  - relampaguear
+
+impersonal_weather_root_forms:
+  - llueve
+  - nieva
+  - graniza
+  - truena
+  - relampaguea
+
+impersonal_hacer_terms:
+  - frío
+  - calor
+
+impersonal_clause_verbs:
+  - parecer
+  - resultar
+  - ocurrir
+  - suceder
+  - bastar
+  - convenir
+
+colloquial_contractions:
+  # One recognized written reduction; apostrophe tokenization variants are compiled at lookup.
+  - "pa"
+  - "pa'"
+  - "pa'que"
+  - "pa'qué"
+  - "pa'rriba"
+  - "pa'ti"
+  - "pa'cá"
+  - "pa'ca"
+  - "pa'dentro"
+  - "pa'ca'rriba"
+  - "pa que"
+  - "pa ti"
+  - "onde"
+  - "nde"
+  - "onde's"
+  - "ontas"
+  - "ta"
+  - "tas"
+  - "toy"
+  - "tábamos"
+
+split_infinitive_adverb_fallbacks:
+  # Adverbs native models can mis-tag in tightly linked interrupted infinitives.
+  - mejor
+  - siquiera
+
+reduced_complement_predicates:
+  # Initial finite/infinitival complement alternation scope; not all control verbs.
+  - creer
+  - esperar
+  - pensar
+
+resumptive_prepositional_frames:
+  # Initial frames chosen to avoid broad que + unrelated PP matching.
+  - hablar_de
+  - depender_de
+  - confiar_en
+
+resumptive_first_person_forms:
+  # Unambiguous accented preterites, lookup-only recovery for this detector.
+  - hablé_hablar
+  - confié_confiar
+
+relative_subject_intransitives:
+  # Positive support for roleless relative que, not an exhaustive valency lexicon.
+  - fallecer
+  - llegar
+  - morir
+  - nacer
+  - venir
 
 linking_matchlist:
   # Verbos copulativos / semicopulativos en espanol
@@ -357,6 +432,35 @@ verb_matchlist:
 # against these suffixes, excluding nominalization_stoplist.
 # Singular and plural variants are explicit inventory entries.
 # ---------------------------------------------------------------------------
+
+# Known common infinitives for NOUN/PROPN annotations without VerbForm=Inf.
+# Other verb identities are reused from the Spanish verb inventories.
+nominal_infinitive_lemmas:
+  - andar
+  - beber
+  - caminar
+  - cantar
+  - comer
+  - dar
+  - despertar
+  - dormir
+  - escribir
+  - existir
+  - fumar
+  - hablar
+  - hacer
+  - ir
+  - leer
+  - mirar
+  - nacer
+  - oír
+  - pensar
+  - reír
+  - saber
+  - sentir
+  - trabajar
+  - venir
+  - vivir
 
 nominalization_suffixes:
   # Equivalentes de -tion / -sion

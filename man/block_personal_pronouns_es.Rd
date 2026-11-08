@@ -2,7 +2,7 @@
 % Please edit documentation in R/features_tense_pronouns.R
 \name{block_personal_pronouns_es}
 \alias{block_personal_pronouns_es}
-\title{Personal pronoun, expletive, and WH-question features (Spanish)}
+\title{Personal pronoun and WH-question features (Spanish)}
 \usage{
 block_personal_pronouns_es(
   tokens,
@@ -24,6 +24,6 @@ block_personal_pronouns_es(
 Data frame: one row per doc, columns f_06-f_08, f_13
 }
 \description{
-Personal pronoun, expletive, and WH-question features (Spanish)
+Personal pronoun and WH-question features (Spanish)
 }
 \keyword{internal}

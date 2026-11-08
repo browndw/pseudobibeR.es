@@ -1,4 +1,4 @@
-# Audit Phase 2 — positive/negative coverage of the 57 Spanish features.
+# Positive/negative coverage of the detectable Spanish features.
 # Cases derived from biber_espanol_completo.md (source of truth).
 # pos_text → must detect (>= pos_min). neg_text → must NOT detect (<= neg_max).
 # neg_text = NA → residual/metric feature with no clean negative (sanity only).
@@ -12,10 +12,13 @@ fc_cases <- list(
   list("f_06_first_person_pronouns","Yo creo que nosotros ganaremos.",              1, "Él dijo que ella vendría.",                   0),
   list("f_07_second_person_pronouns","Tú sabes que usted tiene razón.",             1, "Yo sé que él viene.",                         0),
   list("f_08_third_person_pronouns","Él la vio y ella le habló a ellos.",           1, "Yo te di el libro a ti.",                     0),
+  list("f_09_pronoun_it",          "Llueve.",                                      1, "Llegó ayer. Quiere descansar.",               0),
   list("f_10_demonstrative_pronoun","Eso es importante. Esto me gusta mucho.",      1, "Este libro es mío y esa casa es tuya.",       0),
   list("f_11_indefinite_pronouns", "Alguien llamó pero nadie respondió nada.",      1, "Un perro y una casa grande.",                 0),
+  list("f_12_proverb_do",          "Luis también lo hizo.",                        1, "Hizo una mesa. Lo hizo llorar.",              0),
   list("f_13_wh_question",         "¿Qué quieres? ¿Dónde estás ahora?",             1, "La casa que compré es grande.",               0),
   list("f_14_nominalizations",     "La producción y la evaluación del conocimiento.",1,"El lado del grado del partido.",              0),
+  list("f_15_gerunds",             "El saber es valioso.",                          1, "Fumar perjudica la salud. Quiere estudiar.",   0),
   list("f_16_other_nouns",         "El perro corre en el parque con la pelota.",    2, NA,                                            NA),
   list("f_17_agentless_passives",  "Se publicaron los resultados. La tarea fue realizada.",1,"Juan comió la manzana roja.",          0),
   list("f_18_by_passives",         "El libro fue escrito por María González.",      1, "La tarea fue realizada rápido.",              0),
@@ -30,6 +33,10 @@ fc_cases <- list(
   list("f_27_past_participle_whiz","Los métodos utilizados fueron buenos.",         1, "Terminada la sesión, salieron.",              0),
   list("f_29_that_subj",           "El hombre que vino ayer era alto.",             1, "Dijo que vino tarde.",                        0),
   list("f_30_that_obj",            "El libro que María escribió es famoso.",        1, "Es importante que vengas.",                   0),
+  list("f_31_wh_subj", "Los candidatos, quienes aprobaron el examen, recibieron una beca.", 1,
+       "El libro que María escribió es famoso.", 0),
+  list("f_32_wh_obj", "El informe, el cual María revisó, fue publicado.", 1,
+       "El asunto del cual hablamos es importante.", 0),
   list("f_33_pied_piping",         "La casa en la que vivo. La persona con quien hablé. El motivo por el cual vino. Los temas de los cuales hablamos.",2,"El libro que leí ayer.",0),
   list("f_34_sentence_relatives",  "Llegó tarde, lo cual molestó a todos.",         1, "Lo que quieras está bien.",                   0),
   list("f_35_because",             "No vino porque estaba enfermo.",                1, "Aunque llovía, salió igual.",                 0),
@@ -56,6 +63,14 @@ fc_cases <- list(
   list("f_56_verb_private",        "Creo que sé la respuesta y pienso mucho.",      1, "Corrió rápido y saltó alto.",                 0),
   list("f_57_verb_suasive",        "Le pedí que viniera y recomendé esperar.",      1, "Comió pan y bebió agua.",                     0),
   list("f_58_verb_seem",           "Parece que va a llover pronto.",                1, "Apareció en la reunión tarde.",               0),
+  list("f_59_contractions", "Toy aquí. Ontas? Ven pa’ca’rriba.", 3,
+       "Al salir del taller, compró un toy.", 0),
+  list("f_60_that_deletion", "Pienso ir. Creo haber entendido.", 2,
+       "Pienso que voy a ir. Puedo ir.", 0),
+  list("f_61_stranded_preposition", "Ese es el chico que hablé de él.", 1,
+       "El chico que habló de él llegó.", 0),
+  list("f_62_split_infinitive", "Trato de realmente comprender el problema.", 1,
+       "Lo hizo para no volver.", 0),
   list("f_63_split_auxiliary",     "Ha probablemente sido analizado el caso.",      1, "Fue mostrado el resultado.",                  0),
   list("f_64_phrasal_coordination","Juan y María vinieron temprano.",               1, "Vino pero se fue rápido.",                    0),
   list("f_65_clausal_coordination","Llegó tarde. Y luego se fue.",                  1, "Juan y María vinieron.",                      0),
@@ -189,15 +204,10 @@ test_that("f_44 — caso corto sigue dentro del rango 4-6 (no inflado)", {
 
 # ── Zero-output: the 10 constant columns (surface parity with FR) ─────────
 # Spec README §1 + biber_espanol_completo.md §1: any input must
-# return exactly 0 in these 10 columns. We test with three different
+# return exactly 0 in the remaining compatibility column. We test with three different
 # sentences, including one in English that would trigger the feature in FR/EN.
 
-.zero_output_cols <- c(
-  "f_09_pronoun_it", "f_12_proverb_do", "f_15_gerunds",
-  "f_28_present_participle_whiz", "f_31_wh_subj", "f_32_wh_obj",
-  "f_59_contractions", "f_60_that_deletion",
-  "f_61_stranded_preposition", "f_62_split_infinitive"
-)
+.zero_output_cols <- "f_28_present_participle_whiz"
 
 .zero_output_probes <- c(
   "Es una prueba simple en español.",

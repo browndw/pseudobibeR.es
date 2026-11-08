@@ -13,7 +13,7 @@
 # NOTAS:
 #  - f_01 (pretérito indefinido): verbos con Tense=Past, Mood=Ind, VerbForm=Fin
 #    Ej.: llegó, presentaron, fue (indefinido).
-#  - f_09, f_12, f_15, f_28, f_31, f_32, f_59, f_60, f_61, f_62: rasgos
+#  - f_28: rasgo
 #    zero-output (cicatrices de paridad superficial con pseudobibeR.fr);
 #    no se evalúan aquí porque siempre devuelven 0.
 #  - f_69_mente_adverbs y f_71_preterit ELIMINADOS del corpus (no son rasgos
@@ -113,6 +113,14 @@
   example: "Nadie sabe nada sobre el accidente."
   count: 2.0
 
+- feature: f_12_proverb_do
+  example: "Luis también lo hizo."
+  count: 1.0
+
+- feature: f_12_proverb_do
+  example: "Lo hizo llorar."
+  count: 0.0
+
 # ─────────────────────────────────────────────────────────────────────────────
 # VOZ PASIVA
 # ─────────────────────────────────────────────────────────────────────────────
@@ -200,30 +208,119 @@
   example: "Lo aprobarás si estudias con dedicación."
   count: 1.0
 
-# f_59_contractions ELIMINADO: intraducible. Ver biber_espanol_completo.md.
-# f_60_that_deletion ELIMINADO: intraducible. Ver biber_espanol_completo.md.
+# f_59: contracciones coloquiales y reducciones escritas reconocidas
+- feature: f_59_contractions
+  example: "Toy aquí."
+  count: 1.0
+
+- feature: f_59_contractions
+  example: "Ontas? Ven pa’ca’rriba."
+  count: 2.0
+
+- feature: f_59_contractions
+  example: "Al salir del taller, compró un toy."
+  count: 0.0
+
+# f_60: reduccion de complementos, no solamente omision literal de que
+- feature: f_60_that_deletion
+  example: "Pienso ir."
+  count: 1.0
+
+- feature: f_60_that_deletion
+  example: "Creo haber entendido."
+  count: 1.0
+
+- feature: f_60_that_deletion
+  example: "Nosotros esperamos lleguen mañana."
+  count: 1.0
+
+- feature: f_60_that_deletion
+  example: "Pienso que voy a ir."
+  count: 0.0
+
+- feature: f_60_that_deletion
+  example: "Puedo ir."
+  count: 0.0
+
+# f_61: relativas preposicionales reasuntivas; no pied-piping ni PP independiente
+- feature: f_61_stranded_preposition
+  example: "Ese es el chico que hablé de él."
+  count: 1.0
+
+- feature: f_61_stranded_preposition
+  example: "La mujer que confiamos en ella llegó."
+  count: 1.0
+
+- feature: f_61_stranded_preposition
+  example: "El chico que he hablado de él llegó."
+  count: 1.0
+
+- feature: f_61_stranded_preposition
+  example: "El chico que habló de él llegó."
+  count: 0.0
+
+- feature: f_61_stranded_preposition
+  example: "El chico del que hablé llegó."
+  count: 0.0
+
+- feature: f_61_stranded_preposition
+  example: "El idioma que hablé con él era español."
+  count: 0.0
+
+# f_62: adverbios no negativos interpuestos entre preposicion e infinitivo
+- feature: f_62_split_infinitive
+  example: "Trato de realmente comprender el problema."
+  count: 1.0
+
+- feature: f_62_split_infinitive
+  example: "Lo hizo sin siquiera mirar."
+  count: 1.0
+
+- feature: f_62_split_infinitive
+  example: "Lo hizo para no volver."
+  count: 0.0
+
+- feature: f_62_split_infinitive
+  example: "Lo hizo para no realmente volver."
+  count: 1.0
+
+- feature: f_62_split_infinitive
+  example: "Trato de comprender realmente."
+  count: 0.0
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CLÁUSULAS RELATIVAS
 # ─────────────────────────────────────────────────────────────────────────────
 
-# f_29: fusión de f_29 (that-relativo sujeto) + f_31 (wh-relativo sujeto)
-# En español "que" cubre both that y who/which en posición de sujeto.
+# f_29: relativas de que en funcion de sujeto
 - feature: f_29_that_subj
   example: "El estudiante que llegó tarde no pudo entrar."
   count: 1.0
 
-# f_30: fusión de f_30 (that-relativo objeto) + f_32 (wh-relativo objeto)
-# En Spanish-GSD "que" relativo es siempre SCONJ/mark (absorbido en f_29).
-# f_30 detecta "quien/cual" en posición de objeto (dep_rel=obl/obj).
+# f_30: relativas de que en funcion de objeto
 - feature: f_30_that_obj
   # REVISION HERNAN (Fase 2): 'con quien' es pied-piping -> f_33, no f_30.
   # f_30 (que objeto) requiere sujeto explícito en la relativa (María).
   example: "El libro que María escribió es famoso."
   count: 1.0
 
-# f_31_wh_subject ABSORBIDO en f_29_that_subj (fusión española).
-# f_32_wh_object  ABSORBIDO en f_30_that_obj  (fusión española).
+# f_31: relativas de quien/cual en funcion de sujeto
+- feature: f_31_wh_subj
+  example: "Los candidatos, quienes aprobaron el examen, recibieron una beca."
+  count: 1.0
+
+- feature: f_31_wh_subj
+  example: "No sé quién aprobó el examen."
+  count: 0.0
+
+# f_32: relativas de quien/cual en funcion de objeto; f_33 tiene precedencia
+- feature: f_32_wh_obj
+  example: "El informe, el cual María revisó, fue publicado."
+  count: 1.0
+
+- feature: f_32_wh_obj
+  example: "El informe del cual María habló fue publicado."
+  count: 0.0
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ADJETIVOS, ADVERBIOS, PREPOSICIONES
@@ -393,7 +490,16 @@
 # COMPLEJIDAD LÉXICA
 # ─────────────────────────────────────────────────────────────────────────────
 
-# f_14: nominalizaciones (sufijos productivos: -ción, -ión, -idad, etc.)
+# f_15: infinitivos claramente sustantivados, no todas las clausulas de infinitivo
+- feature: f_15_gerunds
+  example: "El saber es valioso."
+  count: 1.0
+
+- feature: f_15_gerunds
+  example: "Fumar perjudica la salud."
+  count: 0.0
+
+# f_14: nominalizaciones derivadas
 - feature: f_14_nominalizations
   example: "La organización del trabajo y la distribución de tareas mejoran la productividad."
   count: 3.0

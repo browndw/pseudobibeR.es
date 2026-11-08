@@ -19,8 +19,8 @@ block_negation_es(
 
 \item{doc_ids}{One-column data frame with column \code{doc_id}}
 
-\item{neg_synthetic_terms}{Lemmas de pronombres/adverbios negativos
-(nadie, nada, ninguno, ninguna, nunca, jamas)}
+\item{neg_synthetic_terms}{Negative determiner, pronoun, adverb, and
+coordinator lemmas (ninguno, nadie, nada, nunca, jamas, tampoco, ni).}
 
 \item{negation_part_lemmas}{Lemmas de particulas negativas (no)}
 
@@ -33,7 +33,9 @@ identify nominalized <\if{html}{\out{<no>}}>, such as <\if{html}{\out{<un no rot
 Block result with f_66/f_67 counts and token-level evidence.
 }
 \description{
-f_66  Palabras negativas, incluso en concordancia con <\if{html}{\out{<no>}}>
+f_66  Negative lexical word occurrences, including concord with <\if{html}{\out{<no>}}>.
+Ordinary nominal uses with a preceding dependent article are excluded.
+A guarded fallback accepts verbal-subject <\if{html}{\out{<nadie>}}> mis-tagged PROPN.
 f_67  Scoped ADV/PART <\if{html}{\out{<no>}}>, including nominal, pronominal, numeral,
 adjectival, adverbial, and verbal scope. Identifiable reply and noun uses,
 quoted standalone <\if{html}{\out{<no>}}>, and <\if{html}{\out{<no obstante>}}> are excluded.

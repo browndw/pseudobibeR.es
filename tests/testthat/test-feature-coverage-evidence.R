@@ -21,12 +21,15 @@ cases <- list(
   f_06_first_person_pronouns   = list(text = "Yo creo que nosotros podemos mejorar.",                              min_count = 1),
   f_07_second_person_pronouns  = list(text = "Tú debes presentar el informe mañana.",                              min_count = 1),
   f_08_third_person_pronouns   = list(text = "Él llegó primero y ella lo saludó.",                                 min_count = 1),
+  f_09_pronoun_it              = list(text = "Llueve.",                                                          min_count = 1),
   f_10_demonstrative_pronoun   = list(text = "Esto es importante, pero aquello también lo es.",                    min_count = 1),
   f_11_indefinite_pronouns     = list(text = "Alguien dejó algo sobre la mesa.",                                   min_count = 1),
+  f_12_proverb_do              = list(text = "Luis también lo hizo.",                                            min_count = 1),
   # D. Questions
   f_13_wh_question             = list(text = "¿Quién llamó? ¿Qué hora es?",                                          min_count = 1),
   # E. Nominal forms
   f_14_nominalizations         = list(text = "La organización del trabajo mejora la productividad.",               min_count = 1),
+  f_15_gerunds                 = list(text = "El saber es valioso.",                                               min_count = 1),
   f_16_other_nouns             = list(text = "El gato come pescado en la cocina.",                                 min_count = 1),
   # F. Passives
   f_17_agentless_passives      = list(text = "La propuesta fue aprobada sin debate.",                              min_count = 1),
@@ -44,6 +47,8 @@ cases <- list(
   f_27_past_participle_whiz    = list(text = "El informe redactado ayer es muy completo.",                         min_count = 1),
   f_29_that_subj               = list(text = "El estudiante que llegó tarde no pudo entrar.",                      min_count = 1),
   f_30_that_obj                = list(text = "El libro que María escribió es famoso.",                              min_count = 1),
+  f_31_wh_subj                 = list(text = "Los candidatos, quienes aprobaron el examen, recibieron una beca.", min_count = 1),
+  f_32_wh_obj                  = list(text = "El informe, el cual María revisó, fue publicado.", min_count = 1),
   f_33_pied_piping             = list(text = "El asunto del que hablamos requiere atención.",                      min_count = 1),
   f_34_sentence_relatives      = list(text = "El resultado fue inesperado, lo que sorprendió a todos.",            min_count = 1),
   f_35_because                 = list(text = "No pudo asistir porque estaba enfermo.",                             min_count = 1),
@@ -73,6 +78,10 @@ cases <- list(
   f_57_verb_suasive            = list(text = "El comité recomendó revisar el protocolo.",                          min_count = 1),
   f_58_verb_seem               = list(text = "Parece que los resultados no son concluyentes.",                     min_count = 1),
   # N. Reduced forms
+  f_59_contractions            = list(text = "Toy aquí. Ontas? Ven pa’ca’rriba.", min_count = 1),
+  f_60_that_deletion           = list(text = "Nosotros esperamos lleguen mañana.", min_count = 1),
+  f_61_stranded_preposition    = list(text = "Ese es el chico que hablé de él.", min_count = 1),
+  f_62_split_infinitive        = list(text = "Trato de realmente comprender el problema.", min_count = 1),
   f_63_split_auxiliary         = list(text = "Ha probablemente sido analizado por el equipo.",                     min_count = 1),
   # O. Coordination
   f_64_phrasal_coordination    = list(text = "Los estudiantes y los profesores asistieron.",                       min_count = 1),
@@ -83,10 +92,10 @@ cases <- list(
 )
 
 # ---------------------------------------------------------------------------
-# Structural validation: cases covers exactly the 55 .evidence_features
+# Structural validation: cases covers exactly the 58 .evidence_features
 # ---------------------------------------------------------------------------
 
-test_that("cases cubre exactamente los 55 .evidence_features", {
+test_that("cases cubre exactamente los 58 .evidence_features", {
   evidence_pool <- pseudobibeR.es:::.evidence_features
   missing <- setdiff(evidence_pool, names(cases))
   extra   <- setdiff(names(cases), evidence_pool)

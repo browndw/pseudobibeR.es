@@ -4,7 +4,7 @@
 \alias{block_participial_clauses_es}
 \title{Participial and infinitive clause features (Spanish)}
 \usage{
-block_participial_clauses_es(tokens, doc_ids, head_lookup)
+block_participial_clauses_es(tokens, doc_ids, head_lookup, nominal_infinitives)
 }
 \arguments{
 \item{tokens}{Annotated token data frame (UD format)}
@@ -12,6 +12,8 @@ block_participial_clauses_es(tokens, doc_ids, head_lookup)
 \item{doc_ids}{One-column data frame with column \code{doc_id}}
 
 \item{head_lookup}{Pre-built head-token attribute table}
+
+\item{nominal_infinitives}{Shared noun-like infinitive rows excluded from f_24}
 }
 \value{
 Data frame: one row per doc, columns f_24 - f_27

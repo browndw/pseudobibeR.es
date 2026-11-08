@@ -4,7 +4,8 @@
 # LINGUISTIC NOTE -- pro-drop:
 #   Spanish is a null-subject language. Explicit personal pronouns
 #   are markedly informative (contrast, emphasis, disambiguation).
-#   We count ONLY explicit pronouns; null subjects are not counted.
+#   Personal-pronoun features count only explicit forms. Impersonal f_09
+#   counts identified predicates, not inferred subjects or empty nodes.
 #
 # NOTE -- perfect aspect (f_02):
 #   HABER + participle = compound perfect (he llegado).
@@ -99,7 +100,6 @@ auxiliary_complements <- function(tokens) {
 #     f_03  present tense                f_04  place adverbials
 #     f_05  time adverbials              f_11  indefinite pronouns
 #     f_71  imperfect past (Spanish extension)
-#     f_12  REMOVED (untranslatable): the pro-verb "do" does not exist in Spanish
 # -----------------------------------------------------------------------------
 
 #' Tense, aspect, adverbial, and indefinite-pronoun features (Spanish)
@@ -227,11 +227,6 @@ block_tense_es <- function(
     ) %>%
     count_feature_traced("f_11_indefinite_pronoun")
 
-  # f_12 (pro-verb do): UNTRANSLATABLE in Spanish.
-  # Spanish resolves verbal anaphora by ellipsis, with no pro-verb
-  # equivalent to "do". See biber_espanol_completo.md sec. F_12.
-  # Column removed from the output since the Phase 2 audit.
-
   # -- Assemble counts -------------------------------------------------------
   counts <- doc_ids %>%
     dplyr::left_join(f01$counts, by = "doc_id") %>%
@@ -258,10 +253,9 @@ block_tense_es <- function(
 # 2.  block_personal_pronouns_es
 #     f_06  1st person   f_07  2nd person   f_08  3rd person
 #     f_13  wh-question
-#     f_09  REMOVED (untranslatable): Spanish is a null-subject language, there is no expletive "it"
 # -----------------------------------------------------------------------------
 
-#' Personal pronoun, expletive, and WH-question features (Spanish)
+#' Personal pronoun and WH-question features (Spanish)
 #'
 #' @param tokens Annotated token data frame
 #' @param doc_ids One-column data frame with column `doc_id`
@@ -362,12 +356,6 @@ block_personal_pronouns_es <- function(
     possessive_lexical(c("suyo"))
   ) %>% count_feature_traced("f_08_third_person_pronouns")
 
-  # f_09 (pronoun it): UNTRANSLATABLE in Spanish.
-  # Spanish is a null-subject language; there is no expletive equivalent to "it".
-  # Impersonal haber (hay, habia...) is captured in f_20.
-  # See biber_espanol_completo.md sec. F_09.
-  # Column removed from the output since the Phase 2 audit.
-
   # -- f_13  Questions with an interrogative word ---------------------------
   question_sentences <- tokens %>%
     dplyr::filter(.data$token == "?") %>%
@@ -400,4 +388,223 @@ block_personal_pronouns_es <- function(
   evidence <- bind_evidence(f06$evidence, f07$evidence, f08$evidence, f13$evidence)
 
   make_block_result(counts = counts, evidence = evidence)
+}
+
+#' Impersonal predicate features (Spanish)
+#'
+#' Counts weather predicates and selected impersonal clausal constructions.
+#' Each occurrence is anchored on an existing predicate word; no null subject
+#' is inferred. Existential haber remains exclusively in f_20.
+#'
+#' @param tokens Annotated token data frame
+#' @param doc_ids One-column data frame with column `doc_id`
+#' @param weather_lemmas Meteorological verb lemmas
+#' @param weather_root_forms Closed weather forms recoverable at a sentence root
+#' @param weather_hacer_terms Meteorological complements of hacer
+#' @param impersonal_clause_lemmas Selected impersonal clausal verb lemmas
+#' @param nominal_infinitives Shared noun-like infinitive rows
+#' @return Block result with f_09 counts and predicate evidence
+#' @keywords internal
+block_impersonal_predicates_es <- function(
+    tokens, doc_ids, weather_lemmas, weather_root_forms,
+    weather_hacer_terms, impersonal_clause_lemmas, nominal_infinitives) {
+  keys <- c("doc_id", "sentence_id", "token_id_int")
+  excluded_heads <- tokens %>%
+    dplyr::filter(
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^nsubj($|:)") |
+        (.data$pos == "PRON" & tolower(.data$token) == "se") |
+        .data$dep_rel %in% c("expl:impers", "expl:pass")
+    ) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id,
+                    token_id_int = .data$head_token_id_int)
+  nominal_subjects <- nominal_infinitives %>%
+    dplyr::filter(stringr::str_detect(.data$dep_rel, "^(nsubj|csubj)($|:)")) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id,
+                    token_id_int = .data$head_token_id_int)
+  excluded_heads <- dplyr::bind_rows(excluded_heads, nominal_subjects)
+  personal_finite <- tokens %>%
+    dplyr::filter(
+      .data$pos %in% c("VERB", "AUX"), .data$morph_verbform == "Fin",
+      (!is.na(.data$morph_person) & .data$morph_person != "3") |
+        (!is.na(.data$morph_number) & .data$morph_number != "Sing")
+    )
+  excluded_heads <- dplyr::bind_rows(
+    excluded_heads,
+    personal_finite %>% dplyr::select(dplyr::all_of(keys)),
+    personal_finite %>%
+      dplyr::filter(.data$dep_rel %in% c("aux", "aux:pass", "cop")) %>%
+      dplyr::distinct(.data$doc_id, .data$sentence_id,
+                      token_id_int = .data$head_token_id_int)
+  )
+  # An xcomp inherits its controller's subject/agreement, unlike a ccomp.
+  controlled_predicates <- tokens %>%
+    dplyr::filter(stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^xcomp($|:)"))
+  repeat {
+    controlled_heads <- controlled_predicates %>%
+      dplyr::semi_join(excluded_heads, by = c(
+        "doc_id", "sentence_id", "head_token_id_int" = "token_id_int"
+      )) %>%
+      dplyr::select(dplyr::all_of(keys)) %>%
+      dplyr::anti_join(excluded_heads, by = keys)
+    if (!nrow(controlled_heads)) break
+    excluded_heads <- dplyr::bind_rows(excluded_heads, controlled_heads)
+  }
+  candidates <- tokens %>%
+    dplyr::filter(
+      is.na(.data$morph_person) | .data$morph_person == "3",
+      is.na(.data$morph_number) | .data$morph_number == "Sing"
+    ) %>%
+    dplyr::anti_join(excluded_heads, by = keys)
+
+  weather <- candidates %>%
+    dplyr::filter(
+      (.data$pos == "VERB" & .data$lemma %in% weather_lemmas) |
+        (.data$pos %in% c("PROPN", "NOUN", "VERB") & .data$dep_rel == "root" &
+           tolower(.data$token) %in% weather_root_forms)
+    )
+  # Both native models can tag isolated Llueve/Nieva as root proper nouns.
+  nominal_heads <- tokens %>%
+    dplyr::filter(stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^det($|:)")) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id,
+                    token_id_int = .data$head_token_id_int)
+  weather <- dplyr::anti_join(weather, nominal_heads, by = keys)
+  weather_complements <- tokens %>%
+    dplyr::filter(
+      .data$lemma %in% weather_hacer_terms,
+      .data$dep_rel %in% c("obj", "obl")
+    ) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id,
+                    token_id_int = .data$head_token_id_int)
+  hacer <- candidates %>%
+    dplyr::filter(.data$pos == "VERB", .data$lemma == "hacer",
+                  .data$morph_verbform == "Fin") %>%
+    dplyr::semi_join(weather_complements, by = keys)
+
+  que_heads <- tokens %>%
+    dplyr::filter(.data$lemma == "que", .data$dep_rel == "mark") %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id,
+                    token_id_int = .data$head_token_id_int)
+  clauses <- tokens %>%
+    dplyr::filter(
+      .data$pos %in% c("VERB", "AUX"),
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(csubj|ccomp|xcomp)($|:)"),
+      .data$token_id_int > .data$head_token_id_int
+    )
+  finite_clauses <- clauses %>%
+    dplyr::filter(.data$morph_verbform == "Fin") %>%
+    dplyr::semi_join(que_heads, by = keys)
+  subject_clauses <- dplyr::bind_rows(
+    clauses %>% dplyr::filter(.data$morph_verbform == "Inf"),
+    finite_clauses
+  ) %>%
+    dplyr::filter(stringr::str_detect(.data$dep_rel, "^csubj($|:)")) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id,
+                    token_id_int = .data$head_token_id_int)
+  copular_heads <- candidates %>%
+    dplyr::filter(.data$pos == "AUX", .data$lemma %in% c("ser", "estar"),
+                  .data$dep_rel == "cop", .data$morph_verbform == "Fin") %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id,
+                    token_id_int = .data$head_token_id_int)
+  copular <- candidates %>%
+    dplyr::filter(.data$pos == "ADJ") %>%
+    dplyr::semi_join(copular_heads, by = keys) %>%
+    dplyr::semi_join(subject_clauses, by = keys)
+  clausal_heads <- finite_clauses %>%
+    dplyr::filter(stringr::str_detect(.data$dep_rel, "^(csubj|ccomp)($|:)")) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id,
+                    token_id_int = .data$head_token_id_int)
+  clausal <- candidates %>%
+    dplyr::filter(.data$pos == "VERB", .data$lemma %in% impersonal_clause_lemmas,
+                  .data$morph_verbform == "Fin") %>%
+    dplyr::semi_join(clausal_heads, by = keys)
+  infinitive_heads <- clauses %>%
+    dplyr::filter(.data$morph_verbform == "Inf",
+                  stringr::str_detect(.data$dep_rel, "^(csubj|xcomp)($|:)")) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id,
+                    token_id_int = .data$head_token_id_int)
+  infinitival <- candidates %>%
+    dplyr::filter(.data$pos == "VERB", .data$lemma %in% c("bastar", "convenir"),
+                  .data$morph_verbform == "Fin") %>%
+    dplyr::semi_join(infinitive_heads, by = keys)
+
+  f09 <- tokens %>%
+    dplyr::semi_join(dplyr::bind_rows(weather, hacer, copular, clausal, infinitival),
+                     by = keys) %>%
+    count_feature_traced("f_09_pronoun_it")
+  counts <- doc_ids %>%
+    dplyr::left_join(f09$counts, by = "doc_id") %>%
+    dplyr::mutate(f_09_pronoun_it = dplyr::coalesce(.data$f_09_pronoun_it, 0L))
+  make_block_result(counts = counts, evidence = f09$evidence)
+}
+
+#' Anaphoric pro-verb features (Spanish)
+#'
+#' Counts lexical hacer with action-proform lo or lo mismo, excluding
+#' auxiliary/copular, causative, reflexive and overt nominal-object contexts.
+#' Bare lo remains structurally eligible without semantic antecedent resolution.
+#'
+#' @param tokens Annotated token data frame
+#' @param doc_ids One-column data frame with column `doc_id`
+#' @param proverb_pronouns Action-proform surfaces
+#' @return Block result with f_12 counts and predicate evidence
+#' @keywords internal
+block_proverbs_es <- function(tokens, doc_ids, proverb_pronouns) {
+  keys <- c("doc_id", "sentence_id", "token_id_int")
+  heads <- function(rows) {
+    dplyr::distinct(rows, .data$doc_id, .data$sentence_id,
+                    token_id_int = .data$head_token_id_int)
+  }
+  objects <- tokens %>%
+    dplyr::filter(.data$pos == "PRON", .data$token %in% proverb_pronouns,
+                  stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^obj($|:)"))
+  same_modifiers <- tokens %>%
+    dplyr::filter(.data$pos %in% c("PRON", "DET"), .data$token == "lo",
+                  .data$dep_rel == "det")
+  same_objects <- tokens %>%
+    dplyr::filter(
+      .data$token == "mismo", .data$pos %in% c("NOUN", "PRON", "ADJ"),
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^obj($|:)")
+    ) %>%
+    dplyr::semi_join(heads(same_modifiers), by = keys)
+  nominal_objects <- tokens %>%
+    dplyr::filter(
+      .data$pos %in% c("NOUN", "PROPN"),
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(obj|iobj|dislocated)($|:)")
+    ) %>%
+    dplyr::anti_join(same_objects, by = keys)
+  verbal_complements <- tokens %>%
+    dplyr::filter(
+      .data$pos %in% c("VERB", "AUX"),
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(xcomp|ccomp)($|:)")
+    )
+  reflexives <- tokens %>%
+    dplyr::filter(
+      .data$pos == "PRON", .data$token == "se",
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^expl($|:)") |
+        dplyr::coalesce(extract_feat(.data$feats, "Reflex"), "") == "Yes"
+    )
+  excluded_heads <- heads(dplyr::bind_rows(nominal_objects, verbal_complements, reflexives))
+  candidates <- tokens %>%
+    dplyr::filter(
+      .data$pos == "VERB",
+      !stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(aux|cop)($|:)"),
+      .data$lemma == "hacer" |
+        (.data$lemma == "hacer \u00e9l" & stringr::str_ends(.data$token, "lo")) |
+        (.data$token %in% c("haciendo", "haci\u00e9ndo") & .data$morph_verbform == "Ger")
+    ) %>%
+    dplyr::anti_join(excluded_heads, by = keys)
+  # spaCy keeps the enclitic as one word with the compound lemma hacer el.
+  integrated <- candidates %>%
+    dplyr::filter(.data$lemma %in% c("hacer", "hacer \u00e9l"),
+                  stringr::str_ends(.data$token, "lo"))
+  f12 <- dplyr::bind_rows(
+    candidates %>% dplyr::semi_join(heads(objects), by = keys),
+    candidates %>% dplyr::semi_join(heads(same_objects), by = keys),
+    integrated
+  ) %>%
+    count_feature_traced("f_12_proverb_do")
+  counts <- doc_ids %>%
+    dplyr::left_join(f12$counts, by = "doc_id") %>%
+    dplyr::mutate(f_12_proverb_do = dplyr::coalesce(.data$f_12_proverb_do, 0L))
+  make_block_result(counts = counts, evidence = f12$evidence)
 }

@@ -1,5 +1,5 @@
 # features_subordination.R
-# Subordination and clause-embedding features for Spanish (f_21-f_38)
+# Subordination and clause-embedding features for Spanish (f_21-f_38, f_60-f_61)
 #
 # GENERAL STRATEGY:
 #   Complete rewrite that does not rely on pre-computed flags
@@ -13,22 +13,23 @@
 #   f_21  that-complementizer after a verb      ("dijo que...")
 #   f_22  that-complementizer after an adjective ("seguro de que...")
 #   f_23  Wh-clause (relative/indirect question)
-#   f_24  Infinitives (VerbForm=Inf as clausal head)
+#   f_24  Verbal infinitives (excludes noun-like f_15 occurrences)
 #   f_25  Adverbial gerund / complement          (VerbForm=Ger, dep_rel=advcl|ccomp)
 #   f_26  Adverbial / absolute participle        (VerbForm=Part, dep_rel=advcl|ccomp|acl)
 #   f_27  Postnominal participle (whiz-deletion) (VerbForm=Part, dep_rel=acl, head=NOUN)
 #   f_28  REMOVED (untranslatable): the gerund cannot be a noun modifier
-#   f_29  Subject relative with <<que>>/quien/cual  [merge f_29+f_31]
-#   f_30  Object relative with <<que>>/quien/cual   [merge f_30+f_32]
-#   f_31  ABSORBED into f_29
-#   f_32  ABSORBED into f_30
+#   f_29  Subject relative with <<que>>
+#   f_30  Object relative with <<que>>
+#   f_31  Subject relative with quien/cual and agreement forms
+#   f_32  Object relative with quien/cual and agreement forms
 #   f_33  Pied-piping (prep + relative pronoun)
 #   f_34  Sentential relative (eso que, lo que)
 #   f_35  Causal clause (only: porque)
 #   f_36  Concessive clause (only: aunque)
 #   f_37  Conditional clause (si, a_menos_que, salvo_que)
 #   f_38  Other adverbial subordinators
-#   f_60  REMOVED (untranslatable): <<que>> is obligatory in Spanish
+#   f_60  Bounded complement reduction (infinitival or unmarked finite)
+#   f_61  Bounded resumptive prepositional relatives
 
 # -----------------------------------------------------------------------------
 # 1.  block_participial_clauses_es   f_24-f_27 (f_28 removed)
@@ -39,9 +40,10 @@
 #' @param tokens Annotated token data frame (UD format)
 #' @param doc_ids One-column data frame with column `doc_id`
 #' @param head_lookup Pre-built head-token attribute table
+#' @param nominal_infinitives Shared noun-like infinitive rows excluded from f_24
 #' @return Data frame: one row per doc, columns f_24 - f_27
 #' @keywords internal
-block_participial_clauses_es <- function(tokens, doc_ids, head_lookup) {
+block_participial_clauses_es <- function(tokens, doc_ids, head_lookup, nominal_infinitives) {
 
   # Pre-compute verbform per token (avoids calling extract_feat() repeatedly)
   tokens <- tokens %>%
@@ -53,20 +55,12 @@ block_participial_clauses_es <- function(tokens, doc_ids, head_lookup) {
 
   # -- f_24  Verbal infinitives, including roots and auxiliaries -------------
 
-  # -- f_15  Nominal gerund (REVERTED to the original design) ----------------
-  # f_15_gerunds ALWAYS stays at 0: the Spanish gerund (-ando/-iendo)
-  # cannot have a nominal function (that function is covered by the infinitive,
-  # captured by f_24, or by a derived nominalization, captured by f_14). The
-  # author decided to revert the attempt of Hernan's review (Phase 3) to activate
-  # this column via the subject infinitive (csubj); it goes back to the
-  # constant-zero behavior of the original design. See biber_espanol_completo.md §f_15.
-  # The column is filled with 0 in parse_functions.R (surface_only_zero).
-
   f24 <- tokens %>%
     dplyr::filter(
       .data$pos %in% c("VERB", "AUX"),
       .data$.vf == "Inf"
     ) %>%
+    dplyr::anti_join(nominal_infinitives, by = c("doc_id", "sentence_id", "token_id_int")) %>%
     count_feature_traced("f_24_infinitives")
 
   # -- f_25  Adverbial gerund / complement -----------------------------------
@@ -149,19 +143,24 @@ block_participial_clauses_es <- function(tokens, doc_ids, head_lookup) {
 
 #' Relative clause features (Spanish)
 #'
-#' Estrategia UD pura:
-#'   - Clausulas relativas = tokens con dep_rel que comienza por "acl"
-#'     (acl, acl:relcl) cuyo marcador (dep_rel=mark o ref) es un pronombre
-#'     relativo o wh.
-#'   - Tipo de relativa (sujeto/objeto) se determina por la funcion UD
-#'     del pronombre relativo dentro de la clausula subordinada.
+#' Nominal relatives are partitioned by marker family and grammatical role.
+#' Explicit roles receive bounded subject-conflict and agreement checks.
+#' Roleless que requires an external subject or positive intransitive/locative
+#' evidence; ambiguous gaps are not assigned to the subject bin by default.
+#' Detected resumptive que occurrences leave the ordinary gap bins under f_61;
+#' existing pied-piping and sentential-relative precedence is retained.
+#' Pied-piping takes precedence over all other relative categories.
 #'
 #' @param tokens Annotated token data frame
 #' @param doc_ids One-column data frame with column `doc_id`
 #' @param head_lookup Pre-built head-token attribute table
-#' @return Data frame: one row per doc, columns f_29 - f_34
+#' @param subject_intransitives Known intransitive predicates supporting roleless que
+#' @param resumptive_frames Initial predicate-preposition frames for f_61
+#' @param resumptive_first_person_forms Unambiguous first-person surface lookup pairs
+#' @return Data frame: one row per doc, columns f_29 - f_34 and f_61
 #' @keywords internal
-block_relatives_es <- function(tokens, doc_ids, head_lookup) {
+block_relatives_es <- function(tokens, doc_ids, head_lookup, subject_intransitives,
+                               resumptive_frames, resumptive_first_person_forms) {
 
   # Table of relative pronouns/adverbs with their function in the relative clause
   # -- relative pronouns in Spanish UD
@@ -171,10 +170,8 @@ block_relatives_es <- function(tokens, doc_ids, head_lookup) {
     "cuyo", "cuya", "cuyos", "cuyas",
     "donde", "cuando", "como"
   )
-  rel_subj_roles <- c("nsubj", "nsubj:pass")
-  # "nmod" is added to capture "quien/cual" after a preposition (dep_rel=nmod
-  # in Spanish-GSD when the relative pronoun is the object of a PP).
-  rel_obj_roles  <- c("obj", "iobj", "obl", "obl:agent", "nmod")
+  wh_pronouns <- c("quien", "quienes", "cual", "cuales")
+  marker_families <- c("que", wh_pronouns)
 
   # Tokens that are relative pronouns (PronType=Rel or dep_rel=ref|mark
   # and lemma in the list)
@@ -192,16 +189,35 @@ block_relatives_es <- function(tokens, doc_ids, head_lookup) {
         )
     )
 
-  # Head of the relative clause: the token whose dep_rel = acl*
-  # and whose sentence_id matches
+  # Recover a native appos attachment only with explicit relative morphology.
+  appos_ids <- rel_tokens %>%
+    dplyr::filter(
+      .data$lemma %in% marker_families, .data$pos == "PRON",
+      stringr::str_detect(dplyr::coalesce(extract_feat(.data$feats, "PronType"), ""), "Rel")
+    ) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id, appos_id = .data$head_token_id_int)
+  appos_heads <- tokens %>%
+    dplyr::filter(
+      .data$pos %in% c("VERB", "AUX"),
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^appos($|:)"),
+      dplyr::coalesce(extract_feat(.data$feats, "VerbForm"), "") == "Fin"
+    ) %>%
+    dplyr::semi_join(
+      appos_ids, by = c("doc_id", "sentence_id", "token_id_int" = "appos_id")
+    )
   acl_heads <- tokens %>%
     dplyr::filter(
       stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^acl")
     ) %>%
+    dplyr::bind_rows(appos_heads) %>%
     dplyr::transmute(
       .data$doc_id, .data$sentence_id,
       acl_head_id   = .data$token_id_int,
       acl_head_pos  = .data$pos,
+      acl_lemma = .data$lemma,
+      acl_verbform = dplyr::coalesce(extract_feat(.data$feats, "VerbForm"), ""),
+      acl_number = dplyr::coalesce(extract_feat(.data$feats, "Number"), ""),
+      acl_person = dplyr::coalesce(extract_feat(.data$feats, "Person"), ""),
       antecedent_id = .data$head_token_id_int
     )
 
@@ -211,11 +227,12 @@ block_relatives_es <- function(tokens, doc_ids, head_lookup) {
     dplyr::transmute(
       .data$doc_id, .data$sentence_id,
       antecedent_id = .data$token_id_int,
-      ant_pos = .data$pos
+      ant_pos = .data$pos,
+      ant_number = dplyr::coalesce(extract_feat(.data$feats, "Number"), "")
     )
 
   nominal_relatives <- acl_heads %>%
-    dplyr::semi_join(antecedents, by = c("doc_id", "sentence_id", "antecedent_id"))
+    dplyr::inner_join(antecedents, by = c("doc_id", "sentence_id", "antecedent_id"))
   pied_piping <- tokens %>%
     dplyr::group_by(.data$doc_id, .data$sentence_id) %>%
     dplyr::arrange(.data$token_id_int, .by_group = TRUE) %>%
@@ -232,179 +249,84 @@ block_relatives_es <- function(tokens, doc_ids, head_lookup) {
       by = c("doc_id", "sentence_id", "head_token_id_int" = "acl_head_id")
     )
 
-  # Subject/object discriminator for "que" relatives (Spanish-GSD annotates
-  # the relative as SCONJ/mark, with no case distinction). Operational rule
-  # of biber_espanol_completo.md §f_29: "the relative is the subject when,
-  # within the acl:relcl clause, no other nsubj is present" -> its inverse
-  # defines f_30: if the verb of the relative clause HAS an explicit external nsubj
-  # (someone else is the subject), the relative "que" fills the OBJECT gap.
-  # Note: refining by morphological person was dropped because
-  # Spanish-GSD mis-tags the 1st sg preterite ("compre") as
-  # Person=3|Tense=Fut; with pure pro-drop the gap cannot be told apart and
-  # stays in f_29 (documented limitation §2.5/§6/§f_29).
-  relcl_obj_ids <- tokens %>%
+  subjects <- tokens %>%
     dplyr::filter(
-      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^nsubj"),
-      .data$lemma != "que",
-      !is.na(.data$head_token_id_int)
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^nsubj($|:)")
     ) %>%
-    dplyr::distinct(.data$doc_id, .data$sentence_id,
-                    acl_head_id = .data$head_token_id_int) %>%
-    dplyr::mutate(is_obj_relcl = TRUE)
-
-  # -- f_29  Subject relative (que + quien/cual merged) ---------------------
-  # MERGE f_29 + f_31 according to biber_espanol_completo.md:
-  # In Spanish "que" covers both "that" (f_29) and "who/which" (f_31) in
-  # the subject position of a restrictive relative. "Quien/quienes" and
-  # "cual/cuales" are formal variants that are absorbed into f_29.
-  # The formal collapse makes it impossible to tell f_29 and f_31 apart on the surface.
-
-  # Relative pronouns that can be the subject of a relative (que + quien/cual)
-  rel_subj_lemmas <- c("que", "quien", "quienes", "cual", "cuales")
-
-  f29_que <- rel_tokens %>%
+    dplyr::transmute(
+      .data$doc_id, .data$sentence_id, subject_id = .data$token_id_int,
+      clause_head_id = .data$head_token_id_int
+    )
+  external_subjects <- subjects %>%
+    dplyr::anti_join(
+      rel_tokens %>% dplyr::filter(.data$lemma %in% marker_families),
+      by = c("doc_id", "sentence_id", "subject_id" = "token_id_int")
+    ) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id, .data$clause_head_id) %>%
+    dplyr::mutate(external_subject = TRUE)
+  coordinated_subjects <- tokens %>%
     dplyr::filter(
-      .data$lemma == "que",
-      dplyr::coalesce(.data$dep_rel, "") %in% rel_subj_roles
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(conj|cc)($|:)")
     ) %>%
-    dplyr::left_join(
-      acl_heads,
-      by = c("doc_id", "sentence_id",
-             "head_token_id_int" = "acl_head_id")
+    dplyr::inner_join(
+      subjects, by = c("doc_id", "sentence_id", "head_token_id_int" = "subject_id")
     ) %>%
-    dplyr::inner_join(antecedents,
-                      by = c("doc_id", "sentence_id", "antecedent_id"))
-
-  # Extra branch for Spanish-GSD: relative "que" tagged as SCONJ/mark
-  # whose immediate head is a verb with dep_rel=acl* (restrictive relative).
-  # In Spanish-GSD the relative pronoun "que" is annotated as SCONJ/mark,
-  # not as PRON/nsubj. This branch captures both positions (subject and object)
-  # since with Spanish pro-drop they cannot be told apart reliably.
-  f29_que_sconj <- tokens %>%
-    dplyr::filter(
-      .data$lemma == "que",
-      .data$pos   == "SCONJ",
-      dplyr::coalesce(.data$dep_rel, "") == "mark",
-      !is.na(.data$head_token_id_int)
-    ) %>%
-    dplyr::left_join(
-      acl_heads,
-      by = c("doc_id", "sentence_id",
-             "head_token_id_int" = "acl_head_id")
-    ) %>%
-    dplyr::filter(!is.na(.data$antecedent_id)) %>%
-    dplyr::inner_join(antecedents,
-                      by = c("doc_id", "sentence_id", "antecedent_id")) %>%
-    # SUBJECT only: discard relatives whose verb is of the object type
-    dplyr::left_join(
-      relcl_obj_ids,
-      by = c("doc_id", "sentence_id",
-             "head_token_id_int" = "acl_head_id")
-    ) %>%
-    dplyr::filter(!dplyr::coalesce(.data$is_obj_relcl, FALSE))
-
-  # HERNAN REVIEW v2: REVERT of the Phase 2 un-merge, at the author's
-  # explicit request. quien/quienes/cual/cuales are absorbed again into
-  # f_29/f_30 (original merge per biber_espanol_completo.md); f_31/f_32
-  # go back to always-zero columns (see parse_functions.R). The formal
-  # collapse on the surface ("que" covers both "that" and "who/which" in
-  # relative subject/object position) made it impossible to tell them apart
-  # reliably, and that is the original reason for the merge.
-  wh_pronouns   <- c("quien", "quienes", "cual", "cuales")
-
-  f29_wh <- rel_tokens %>%
-    dplyr::filter(
-      .data$lemma %in% wh_pronouns,
-      dplyr::coalesce(.data$dep_rel, "") %in% rel_subj_roles
-    ) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id, .data$clause_head_id) %>%
+    dplyr::mutate(coordinated_subject = TRUE)
+  case_en <- tokens %>%
+    dplyr::filter(.data$pos == "ADP", .data$lemma == "en", .data$dep_rel == "case") %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id, locative_id = .data$head_token_id_int)
+  locative_heads <- tokens %>%
+    dplyr::filter(stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^obl($|:)")) %>%
     dplyr::semi_join(
+      case_en, by = c("doc_id", "sentence_id", "token_id_int" = "locative_id")
+    ) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id, clause_head_id = .data$head_token_id_int) %>%
+    dplyr::mutate(locative = TRUE)
+  classified_relatives <- rel_tokens %>%
+    dplyr::filter(.data$lemma %in% marker_families) %>%
+    dplyr::inner_join(
       nominal_relatives,
       by = c("doc_id", "sentence_id", "head_token_id_int" = "acl_head_id")
+    ) %>%
+    dplyr::anti_join(pied_piping, by = c("doc_id", "sentence_id", "token_id_int")) %>%
+    dplyr::left_join(
+      external_subjects, by = c("doc_id", "sentence_id", "head_token_id_int" = "clause_head_id")
+    ) %>%
+    dplyr::left_join(
+      coordinated_subjects, by = c("doc_id", "sentence_id", "head_token_id_int" = "clause_head_id")
+    ) %>%
+    dplyr::left_join(
+      locative_heads, by = c("doc_id", "sentence_id", "head_token_id_int" = "clause_head_id")
+    ) %>%
+    dplyr::mutate(
+      external_subject = dplyr::coalesce(.data$external_subject, FALSE),
+      coordinated_subject = dplyr::coalesce(.data$coordinated_subject, FALSE),
+      locative = dplyr::coalesce(.data$locative, FALSE),
+      source_subject = stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^nsubj($|:)"),
+      source_object = stringr::str_detect(
+        dplyr::coalesce(.data$dep_rel, ""), "^(obj|iobj|obl|nmod)($|:)"
+      ),
+      roleless_que = .data$lemma == "que" & .data$pos == "SCONJ" &
+        dplyr::coalesce(.data$dep_rel, "") == "mark",
+      agreement_conflict = .data$ant_number == "Sing" &
+        dplyr::coalesce(extract_feat(.data$feats, "Number"), "") == "Sing" &
+        .data$acl_verbform == "Fin" & .data$acl_number == "Plur" &
+        .data$acl_person %in% c("1", "2"),
+      relative_role = dplyr::case_when(
+        .data$source_object ~ "object",
+        .data$source_subject & !.data$coordinated_subject &
+          (.data$external_subject | .data$agreement_conflict) ~ "object",
+        .data$source_subject ~ "subject",
+        .data$roleless_que & .data$external_subject & !.data$coordinated_subject ~ "object",
+        .data$roleless_que & !.data$external_subject & .data$acl_verbform == "Fin" &
+          (.data$acl_lemma %in% subject_intransitives |
+             (.data$acl_lemma == "estar" & .data$locative)) ~ "subject",
+        TRUE ~ NA_character_
+      )
     )
-
-  # Phase 2f: select() keeps the E1 columns before bind_rows; the
-  # dedup and the evidence are done by count_feature_traced (same dedup as
-  # the previous distinct, now with .keep_all = TRUE to keep
-  # token/lemma/pos/feats).
   rel_evidence_cols <- c("doc_id", "sentence_id", "token_id_int",
                          "token", "lemma", "pos", "feats", "head_token_id_int")
-  f29 <- dplyr::bind_rows(
-    f29_que       %>% dplyr::select(dplyr::all_of(rel_evidence_cols)),
-    f29_que_sconj %>% dplyr::select(dplyr::all_of(rel_evidence_cols)),
-    f29_wh        %>% dplyr::select(dplyr::all_of(rel_evidence_cols))
-  ) %>%
-    dplyr::anti_join(
-      pied_piping, by = c("doc_id", "sentence_id", "token_id_int")
-    ) %>%
-    count_feature_traced("f_29_that_subj")
-
-  # -- f_30  Object relative (que + quien/cual merged) ----------------------
-  # MERGE f_30 + f_32 according to biber_espanol_completo.md:
-  # Same reasoning as f_29+f_31, for the object position.
-
-  f30_que <- rel_tokens %>%
-    dplyr::filter(
-      .data$lemma == "que",
-      dplyr::coalesce(.data$dep_rel, "") %in% rel_obj_roles
-    ) %>%
-    dplyr::left_join(
-      acl_heads,
-      by = c("doc_id", "sentence_id",
-             "head_token_id_int" = "acl_head_id")
-    ) %>%
-    dplyr::inner_join(antecedents,
-                      by = c("doc_id", "sentence_id", "antecedent_id"))
-
-  # SCONJ/mark branch for object "que": when the acl:relcl verb has an
-  # explicit subject (not pro-dropped), the gap is the object.
-  # In practice, f_30 captures quien/cual in object position (detectable)
-  # and "que"/SCONJ/mark whose relative clause has an explicit nsubj.
-  f30_que_obj <- tokens %>%
-    dplyr::filter(
-      .data$lemma == "que",
-      .data$pos   == "SCONJ",
-      dplyr::coalesce(.data$dep_rel, "") == "mark",
-      !is.na(.data$head_token_id_int)
-    ) %>%
-    dplyr::left_join(
-      acl_heads,
-      by = c("doc_id", "sentence_id",
-             "head_token_id_int" = "acl_head_id")
-    ) %>%
-    dplyr::filter(!is.na(.data$antecedent_id)) %>%
-    dplyr::inner_join(antecedents,
-                      by = c("doc_id", "sentence_id", "antecedent_id")) %>%
-    # OBJECT only: relatives whose verb has an external nsubj or is 1st/2nd person
-    # (pro-dropped subject -> the relative "que" fills the object gap).
-    # biber_espanol_completo.md §f_30.
-    dplyr::inner_join(
-      relcl_obj_ids,
-      by = c("doc_id", "sentence_id",
-             "head_token_id_int" = "acl_head_id")
-    )
-
-  f30_wh <- rel_tokens %>%
-    dplyr::filter(
-      .data$lemma %in% wh_pronouns,
-      dplyr::coalesce(.data$dep_rel, "") %in% rel_obj_roles
-    ) %>%
-    dplyr::semi_join(
-      nominal_relatives,
-      by = c("doc_id", "sentence_id", "head_token_id_int" = "acl_head_id")
-    )
-
-  f30 <- dplyr::bind_rows(
-    f30_que     %>% dplyr::select(dplyr::all_of(rel_evidence_cols)),
-    f30_que_obj %>% dplyr::select(dplyr::all_of(rel_evidence_cols)),
-    f30_wh      %>% dplyr::select(dplyr::all_of(rel_evidence_cols))
-  ) %>%
-    dplyr::anti_join(
-      pied_piping, by = c("doc_id", "sentence_id", "token_id_int")
-    ) %>%
-    count_feature_traced("f_30_that_obj")
-
-  # f_31 and f_32 are absorbed into f_29 and f_30 respectively (REVERT at the
-  # author's request). No separate columns are generated in the output.
 
   # -- f_33  Pied-piping (preposition + relative pronoun) --------------------
   # In Spanish the typical pied-piping pattern in UDPipe Spanish-GSD is:
@@ -503,20 +425,178 @@ block_relatives_es <- function(tokens, doc_ids, head_lookup) {
     f34        %>% dplyr::select(dplyr::all_of(rel_evidence_cols)),
     f34_locual %>% dplyr::select(dplyr::all_of(rel_evidence_cols))
   ) %>%
+    dplyr::anti_join(pied_piping, by = c("doc_id", "sentence_id", "token_id_int")) %>%
     count_feature_traced("f_34_sentence_relatives")
 
-  # f_31 and f_32 have been absorbed into f_29 and f_30 respectively
-  # (merge per biber_espanol_completo.md); no separate columns are generated.
+  classified_relatives <- classified_relatives %>%
+    dplyr::anti_join(
+      f34$evidence, by = c("doc_id", "sentence_id", "token_id_int" = "token_id")
+    )
+  resumptions <- resumptive_relative_rows(
+    tokens, classified_relatives, resumptive_frames, resumptive_first_person_forms
+  )
+  f61 <- count_feature_traced(resumptions$rows, "f_61_stranded_preposition")
+  classified_relatives <- dplyr::anti_join(
+    classified_relatives, resumptions$markers,
+    by = c("doc_id", "sentence_id", "token_id_int")
+  )
+  f29 <- classified_relatives %>%
+    dplyr::filter(.data$lemma == "que", .data$relative_role == "subject") %>%
+    count_feature_traced("f_29_that_subj")
+  f30 <- classified_relatives %>%
+    dplyr::filter(.data$lemma == "que", .data$relative_role == "object") %>%
+    count_feature_traced("f_30_that_obj")
+  f31 <- classified_relatives %>%
+    dplyr::filter(.data$lemma %in% wh_pronouns, .data$relative_role == "subject") %>%
+    count_feature_traced("f_31_wh_subj")
+  f32 <- classified_relatives %>%
+    dplyr::filter(.data$lemma %in% wh_pronouns, .data$relative_role == "object") %>%
+    count_feature_traced("f_32_wh_obj")
   counts <- doc_ids %>%
     dplyr::left_join(f29$counts, by = "doc_id") %>%
     dplyr::left_join(f30$counts, by = "doc_id") %>%
+    dplyr::left_join(f31$counts, by = "doc_id") %>%
+    dplyr::left_join(f32$counts, by = "doc_id") %>%
     dplyr::left_join(f33$counts, by = "doc_id") %>%
     dplyr::left_join(f34$counts, by = "doc_id") %>%
+    dplyr::left_join(f61$counts, by = "doc_id") %>%
     dplyr::mutate(
       dplyr::across(-dplyr::any_of("doc_id"), ~ dplyr::coalesce(., 0L))
     )
-  evidence <- bind_evidence(f29$evidence, f30$evidence, f33$evidence, f34$evidence)
+  evidence <- bind_evidence(f29$evidence, f30$evidence, f31$evidence, f32$evidence,
+                            f33$evidence, f34$evidence, f61$evidence)
   make_block_result(counts = counts, evidence = evidence)
+}
+
+resumptive_pair_lookup <- function(values, columns) {
+  pairs <- strsplit(values, "_", fixed = TRUE)
+  if (any(lengths(pairs) != 2L)) {
+    stop("Resumptive lookup entries must contain exactly two underscore-separated fields.",
+         call. = FALSE)
+  }
+  result <- tibble::tibble(
+    first = vapply(pairs, `[`, character(1), 1L),
+    second = vapply(pairs, `[`, character(1), 2L)
+  )
+  names(result) <- columns
+  result
+}
+
+resumptive_relative_rows <- function(tokens, relatives, frames, first_person_forms) {
+  keys <- c("doc_id", "sentence_id", "token_id_int")
+  frames <- resumptive_pair_lookup(frames, c("predicate_lemma", "preposition"))
+  first_person_forms <- resumptive_pair_lookup(
+    first_person_forms, c("predicate_surface", "fallback_lemma")
+  )
+  eligible <- relatives %>%
+    dplyr::filter(.data$token == "que", .data$pos %in% c("PRON", "SCONJ"))
+  if (nrow(eligible) == 0L) {
+    return(list(rows = tokens[0, ], markers = relatives[0, keys]))
+  }
+  finite <- tokens %>%
+    dplyr::filter(.data$pos %in% c("VERB", "AUX"), .data$morph_verbform == "Fin")
+  finite_heads <- dplyr::bind_rows(
+    finite %>% dplyr::transmute(
+      .data$doc_id, .data$sentence_id, head_token_id_int = .data$token_id_int,
+      finite_person = .data$morph_person
+    ),
+    finite %>%
+      dplyr::filter(
+        stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(aux|cop)($|:)")
+      ) %>%
+      dplyr::transmute(.data$doc_id, .data$sentence_id, .data$head_token_id_int,
+                       finite_person = .data$morph_person)
+  ) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id, .data$head_token_id_int,
+                    .keep_all = TRUE) %>%
+    dplyr::mutate(finite_predicate = TRUE)
+  eligible <- eligible %>%
+    dplyr::left_join(
+      tokens %>% dplyr::transmute(
+        .data$doc_id, .data$sentence_id, head_token_id_int = .data$token_id_int,
+        predicate_surface = .data$token, predicate_pos = .data$pos
+      ),
+      by = c("doc_id", "sentence_id", "head_token_id_int")
+    ) %>%
+    dplyr::left_join(first_person_forms, by = "predicate_surface") %>%
+    dplyr::left_join(finite_heads, by = c("doc_id", "sentence_id", "head_token_id_int")) %>%
+    dplyr::mutate(
+      predicate_lemma = dplyr::coalesce(.data$fallback_lemma, .data$acl_lemma),
+      finite_person = dplyr::if_else(!is.na(.data$fallback_lemma), "1", .data$finite_person),
+      finite_predicate = !is.na(.data$fallback_lemma) |
+        dplyr::coalesce(.data$finite_predicate, FALSE)
+    ) %>%
+    dplyr::filter(
+      .data$finite_predicate,
+      .data$predicate_pos %in% c("VERB", "AUX") | !is.na(.data$fallback_lemma),
+      .data$external_subject | .data$finite_person %in% c("1", "2"),
+      !(.data$source_subject & .data$coordinated_subject),
+      .data$antecedent_id < .data$token_id_int,
+      .data$token_id_int < .data$head_token_id_int
+    ) %>%
+    dplyr::inner_join(frames, by = "predicate_lemma") %>%
+    dplyr::left_join(
+      tokens %>% dplyr::transmute(
+        .data$doc_id, .data$sentence_id, antecedent_id = .data$token_id_int,
+        ant_gender = dplyr::coalesce(extract_feat(.data$feats, "Gender"), "")
+      ),
+      by = c("doc_id", "sentence_id", "antecedent_id")
+    )
+  indexed <- tokens %>% dplyr::mutate(.row_id = seq_len(nrow(tokens)))
+  cases <- indexed %>%
+    dplyr::filter(
+      .data$pos == "ADP",
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^case($|:)")
+    ) %>%
+    dplyr::transmute(.data$doc_id, .data$sentence_id,
+                     pronoun_id = .data$head_token_id_int,
+                     prep_id = .data$token_id_int, prep_row = .data$.row_id,
+                     preposition = .data$lemma)
+  pronouns <- indexed %>%
+    dplyr::filter(
+      .data$pos == "PRON", .data$token %in% c("\u00e9l", "ella", "ellos", "ellas"),
+      is.na(.data$morph_person) | .data$morph_person == "3",
+      stringr::str_detect(
+        dplyr::coalesce(.data$dep_rel, ""), "^(obl|nmod|obj|iobj)($|:)"
+      )
+    ) %>%
+    dplyr::transmute(
+      .data$doc_id, .data$sentence_id, pronoun_id = .data$token_id_int,
+      head_token_id_int = .data$head_token_id_int, pronoun_row = .data$.row_id,
+      pronoun_gender = dplyr::coalesce(extract_feat(.data$feats, "Gender"), ""),
+      pronoun_number = dplyr::coalesce(.data$morph_number, "")
+    )
+  pp <- dplyr::inner_join(cases, pronouns, by = c("doc_id", "sentence_id", "pronoun_id")) %>%
+    dplyr::filter(.data$pronoun_row == .data$prep_row + 1L)
+  bare_objects <- tokens %>%
+    dplyr::filter(
+      .data$pos %in% c("NOUN", "PROPN", "PRON"),
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^obj($|:)")
+    ) %>%
+    dplyr::anti_join(relatives, by = keys) %>%
+    dplyr::anti_join(
+      cases, by = c("doc_id", "sentence_id", "token_id_int" = "pronoun_id")
+    ) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id, .data$head_token_id_int)
+  matches <- eligible %>%
+    dplyr::anti_join(bare_objects, by = c("doc_id", "sentence_id", "head_token_id_int")) %>%
+    dplyr::inner_join(pp, by = c("doc_id", "sentence_id", "head_token_id_int", "preposition")) %>%
+    dplyr::filter(
+      .data$prep_id > .data$head_token_id_int,
+      .data$ant_gender == "" | .data$pronoun_gender == "" |
+        .data$ant_gender == .data$pronoun_gender,
+      .data$ant_number == "" | .data$pronoun_number == "" |
+        .data$ant_number == .data$pronoun_number
+    )
+  markers <- dplyr::distinct(matches, .data$doc_id, .data$sentence_id, .data$token_id_int)
+  matches <- matches %>%
+    dplyr::arrange(.data$prep_row) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id, .data$head_token_id_int, .keep_all = TRUE)
+  rows <- tokens[matches$prep_row, ]
+  rows$token <- vapply(seq_len(nrow(matches)), function(i) {
+    paste(tokens$token[seq.int(matches$prep_row[i], matches$pronoun_row[i])], collapse = " ")
+  }, character(1))
+  list(rows = rows, markers = markers)
 }
 
 # -----------------------------------------------------------------------------
@@ -533,9 +613,6 @@ block_relatives_es <- function(tokens, doc_ids, head_lookup) {
 #' f_37  Subordinada condicional (si, a_menos_que, salvo_que)
 #' f_38  Otros subordinadores adverbiales (cuando, mientras, antes_de_que?)
 #'
-#' f_60 (that-deletion) ELIMINADO: intraducible. En espanol el complementante
-#' <<que>> es practicamente obligatorio; su omision es agramatical.
-#' biber_espanol_completo.md sec. F_60.
 #'
 #' @param tokens Annotated token data frame
 #' @param doc_ids One-column data frame with column `doc_id`
@@ -652,34 +729,6 @@ block_clause_embedding_es <- function(tokens, doc_ids, head_lookup,
   # (ambivalent) and sometimes normalizes the accent in the lemma. Therefore:
   # (a) Require an accent in the SURFACE FORM of the token (not only in the lemma).
   # (b) Exclude heads whose dep_rel is acl/acl:relcl (clearly relatives).
-  wh_adv_tilde <- c("d\u00f3nde", "cu\u00e1ndo", "c\u00f3mo",
-                    "cu\u00e1nto", "cu\u00e1nta",
-                    "cu\u00e1ntos", "cu\u00e1ntas")
-  wh_pron_tilde <- c("qu\u00e9", "qui\u00e9n", "qui\u00e9nes",
-                     "cu\u00e1l", "cu\u00e1les")
-  # Unaccented lemmas we accept ONLY if the surface token carries an accent
-  # (makes up for the inconsistent lemmatization of UDPipe spanish-gsd).
-  wh_pron_lemmas <- c(wh_pron_tilde,
-                      "que", "quien", "quienes", "cual", "cuales")
-
-  is_int_pron <- tokens %>%
-    dplyr::filter(
-      .data$pos %in% c("PRON", "DET", "ADJ"),
-      .data$lemma %in% wh_pron_lemmas,
-      stringr::str_detect(
-        dplyr::coalesce(.data$feats, ""), "PronType=[^|]*Int"
-      ),
-      # Accent in the surface form -- discards relative "que/quien/cual"
-      tolower(.data$token) %in% wh_pron_tilde |
-        .data$lemma %in% wh_pron_tilde
-    )
-
-  is_int_adv <- tokens %>%
-    dplyr::filter(
-      .data$pos == "ADV",
-      .data$lemma %in% wh_adv_tilde
-    )
-
   # dep_rel of the verb heading the wh-clause: if it is "root" the clause
   # is the main clause -> DIRECT question (goes to f_13, NOT to f_23). The indirect
   # question has the verb subordinated (ccomp/xcomp/advcl/acl...).
@@ -691,7 +740,7 @@ block_clause_embedding_es <- function(tokens, doc_ids, head_lookup,
       wh_head_dep = .data$dep_rel
     )
 
-  f23 <- dplyr::bind_rows(is_int_pron, is_int_adv) %>%
+  f23 <- interrogative_clause_tokens(tokens) %>%
     dplyr::filter(
       stringr::str_detect(
         dplyr::coalesce(.data$dep_rel, ""),
@@ -845,9 +894,6 @@ block_clause_embedding_es <- function(tokens, doc_ids, head_lookup,
     ) %>%
     count_feature_traced("f_38_other_adv_sub")
 
-  # f_60 (that-deletion) REMOVED: untranslatable.
-  # See the docstring and biber_espanol_completo.md sec. F_60.
-
   counts <- doc_ids %>%
     dplyr::left_join(f21$counts, by = "doc_id") %>%
     dplyr::left_join(f22$counts, by = "doc_id") %>%
@@ -866,4 +912,112 @@ block_clause_embedding_es <- function(tokens, doc_ids, head_lookup,
   )
 
   make_block_result(counts = counts, evidence = evidence)
+}
+
+interrogative_clause_tokens <- function(tokens, strict = TRUE) {
+  wh_adv <- c("d\u00f3nde", "cu\u00e1ndo", "c\u00f3mo", "cu\u00e1nto",
+              "cu\u00e1nta", "cu\u00e1ntos", "cu\u00e1ntas")
+  wh_pron <- c("qu\u00e9", "qui\u00e9n", "qui\u00e9nes", "cu\u00e1l", "cu\u00e1les")
+  # f60 excludes accented introducers even when their PronType is mistagged.
+  if (!strict) {
+    return(tokens %>% dplyr::filter(
+      .data$pos %in% c("PRON", "DET", "ADJ", "ADV", "SCONJ"),
+      .data$token %in% c(wh_adv, wh_pron) | .data$lemma %in% c(wh_adv, wh_pron)
+    ))
+  }
+  pronouns <- tokens %>%
+    dplyr::filter(
+      .data$pos %in% c("PRON", "DET", "ADJ"),
+      .data$lemma %in% c(wh_pron, "que", "quien", "quienes", "cual", "cuales"),
+      stringr::str_detect(dplyr::coalesce(.data$feats, ""), "PronType=[^|]*Int"),
+      tolower(.data$token) %in% wh_pron | .data$lemma %in% wh_pron
+    )
+  adverbs <- tokens %>%
+    dplyr::filter(.data$pos == "ADV", .data$lemma %in% wh_adv)
+  dplyr::bind_rows(pronouns, adverbs)
+}
+
+#' Bounded complement-clause reductions (Spanish f_60)
+#'
+#' Counts infinitival and unmarked finite complements of the supplied lexical
+#' predicates, including projected auxiliary/copular forms and clear coordinated
+#' complements. This is a functional reduction analogue, not literal que deletion.
+#' Overt introducers, interrogative complements and nominal infinitives are excluded.
+#'
+#' @param tokens Prepared annotated token data frame
+#' @param doc_ids One-column data frame with document identifiers
+#' @param head_lookup Pre-built head-token attribute table
+#' @param predicates Initial lexical complement-predicate inventory
+#' @param nominal_infinitives Shared noun-like infinitive occurrence rows
+#' @return Block result with f_60 counts and clause-head occurrence evidence
+#' @keywords internal
+block_reduced_complements_es <- function(tokens, doc_ids, head_lookup,
+                                         predicates, nominal_infinitives) {
+  keys <- c("doc_id", "sentence_id", "token_id_int")
+  introduced <- dplyr::bind_rows(
+    tokens %>% dplyr::filter(
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^mark($|:)") |
+        .data$pos == "SCONJ" | .data$lemma == "que" | .data$token == "que" |
+        stringr::str_detect(dplyr::coalesce(.data$feats, ""), "PronType=[^|]*Rel")
+    ),
+    interrogative_clause_tokens(tokens, strict = FALSE)
+  ) %>%
+    dplyr::transmute(.data$doc_id, .data$sentence_id,
+                     token_id_int = .data$head_token_id_int) %>%
+    dplyr::distinct() %>%
+    dplyr::mutate(introduced = TRUE)
+  candidates <- tokens %>%
+    dplyr::left_join(introduced, by = keys)
+  clauses <- candidates %>%
+    dplyr::filter(
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(ccomp|xcomp)($|:)")
+    ) %>%
+    dplyr::left_join(
+      head_lookup, by = c("doc_id", "sentence_id", "head_token_id_int" = "token_id_int")
+    ) %>%
+    dplyr::filter(.data$head_pos == "VERB", .data$head_lemma %in% predicates) %>%
+    dplyr::anti_join(nominal_infinitives, by = keys) %>%
+    dplyr::select(dplyr::all_of(names(candidates))) %>%
+    dplyr::mutate(introduced = dplyr::coalesce(.data$introduced, FALSE))
+  coordinated <- candidates %>%
+    dplyr::filter(stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^conj($|:)"))
+  repeat {
+    children <- coordinated %>%
+      dplyr::inner_join(
+        clauses %>% dplyr::select(
+          dplyr::all_of(keys), parent_introduced = "introduced"
+        ),
+        by = c("doc_id", "sentence_id", "head_token_id_int" = "token_id_int")
+      ) %>%
+      dplyr::anti_join(clauses, by = keys) %>%
+      dplyr::anti_join(nominal_infinitives, by = keys) %>%
+      dplyr::mutate(
+        introduced = dplyr::coalesce(.data$introduced, FALSE) | .data$parent_introduced
+      ) %>%
+      dplyr::select(dplyr::all_of(names(clauses)))
+    if (nrow(children) == 0L) break
+    clauses <- dplyr::bind_rows(clauses, children)
+  }
+  verbal_forms <- tokens %>%
+    dplyr::filter(
+      .data$pos %in% c("VERB", "AUX"), .data$morph_verbform %in% c("Fin", "Inf")
+    )
+  forms <- dplyr::bind_rows(
+    verbal_forms %>% dplyr::select(dplyr::all_of(keys), "morph_verbform"),
+    verbal_forms %>%
+      dplyr::filter(
+        stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(aux|cop)($|:)")
+      ) %>%
+      dplyr::transmute(.data$doc_id, .data$sentence_id,
+                       token_id_int = .data$head_token_id_int, .data$morph_verbform)
+  ) %>%
+    dplyr::distinct(.data$doc_id, .data$sentence_id, .data$token_id_int)
+  rows <- tokens %>%
+    dplyr::semi_join(clauses %>% dplyr::filter(!.data$introduced), by = keys) %>%
+    dplyr::semi_join(forms, by = keys)
+  traced <- count_feature_traced(rows, "f_60_that_deletion")
+  counts <- doc_ids %>%
+    dplyr::left_join(traced$counts, by = "doc_id") %>%
+    dplyr::mutate(f_60_that_deletion = dplyr::coalesce(.data$f_60_that_deletion, 0L))
+  make_block_result(counts = counts, evidence = traced$evidence)
 }

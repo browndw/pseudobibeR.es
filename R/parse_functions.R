@@ -10,6 +10,7 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
   word_lists <- pseudobibeR.es::word_lists
   doc_ids <- dplyr::distinct(tokens, .data$doc_id)
   tokens <- flag_mwe_tokens(tokens, get_word_list(word_lists, "multiword_patterns"))
+  nominal_infinitives <- nominal_infinitive_rows(tokens, word_lists, dict)
   head_lookup <- tokens %>%
     dplyr::select(
       "doc_id", "sentence_id", "token_id_int",
@@ -38,14 +39,38 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
       dictionary_to_lemmas(dict, "f_11_indefinite_pronoun")
     ),
     block_personal_pronouns_es(tokens, doc_ids),
-    block_lexical_membership_es(tokens, doc_ids, word_lists),
+    block_proverbs_es(tokens, doc_ids, get_word_list(word_lists, "proverb_object_pronouns")),
+    block_impersonal_predicates_es(
+      tokens, doc_ids,
+      get_word_list(word_lists, "impersonal_weather_verbs"),
+      get_word_list(word_lists, "impersonal_weather_root_forms"),
+      get_word_list(word_lists, "impersonal_hacer_terms"),
+      get_word_list(word_lists, "impersonal_clause_verbs"),
+      nominal_infinitives
+    ),
+    block_lexical_membership_es(tokens, doc_ids, word_lists, nominal_infinitives),
     block_passive_voice_es(tokens, doc_ids, head_lookup, engine),
     block_clause_embedding_es(tokens, doc_ids, head_lookup),
-    block_participial_clauses_es(tokens, doc_ids, head_lookup),
-    block_relatives_es(tokens, doc_ids, head_lookup),
+    block_reduced_complements_es(
+      tokens, doc_ids, head_lookup,
+      get_word_list(word_lists, "reduced_complement_predicates"), nominal_infinitives
+    ),
+    block_participial_clauses_es(tokens, doc_ids, head_lookup, nominal_infinitives),
+    block_relatives_es(
+      tokens, doc_ids, head_lookup, get_word_list(word_lists, "relative_subject_intransitives"),
+      get_word_list(word_lists, "resumptive_prepositional_frames"),
+      get_word_list(word_lists, "resumptive_first_person_forms")
+    ),
     block_adj_prep_adv_es(tokens, doc_ids, dict, word_lists, neg_adverbs),
     block_specialized_verbs_es(tokens, doc_ids, dict),
     block_modals_es(tokens, doc_ids, dict),
+    block_contractions_es(tokens, doc_ids, get_word_list(word_lists, "colloquial_contractions")),
+    block_interrupted_infinitives_es(
+      tokens, doc_ids,
+      normalize_terms(c(neg_terms, neg_adverbs,
+                        get_word_list(word_lists, "neg_synthetic_determiners"))),
+      get_word_list(word_lists, "split_infinitive_adverb_fallbacks"), nominal_infinitives
+    ),
     block_split_coordination_es(
       tokens, doc_ids, token_lookup, subject_heads, neg_terms,
       c(dictionary_to_lemmas(dict, "f_52_modal_possibility", head_word = TRUE),

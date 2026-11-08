@@ -92,13 +92,11 @@
   f_67_neg_analytic            = "P. Negacion"
 )
 
-#' List of the 10 zero-output features (internal)
+#' The compatibility-zero feature (internal)
 #'
 #' Features that appear as columns in the \code{biber()} output for
 #' surface parity with \code{pseudobibeR.fr} but whose value is always
-#' 0 because the underlying linguistic property does not carry over to Spanish
-#' (null subject, no orthographic contractions, no stranded preposition,
-#' etc.) or because it was absorbed by a merge (f_31 -> f_29; f_32 -> f_30).
+#' 0 because detection is unavailable or its Spanish scope remains pending.
 #' Documented in the Spanish feature table and README.
 #'
 #' Used by \code{biber_es_traced()} and the tests to tell apart
@@ -108,16 +106,7 @@
 #' @keywords internal
 #' @noRd
 .zero_output_features <- c(
-  "f_09_pronoun_it",
-  "f_12_proverb_do",
-  "f_15_gerunds",
-  "f_28_present_participle_whiz",
-  "f_31_wh_subj",
-  "f_32_wh_obj",
-  "f_59_contractions",
-  "f_60_that_deletion",
-  "f_61_stranded_preposition",
-  "f_62_split_infinitive"
+  "f_28_present_participle_whiz"
 )
 
 #' List of the 2 metric features (internal)
@@ -141,9 +130,9 @@
   "f_44_mean_word_length"
 )
 
-#' List of the 57 features with real detection (internal)
+#' List of the 66 features with real detection (internal)
 #'
-#' Derived by difference: 67 total - 10 zero-output = 57 detectable.
+#' Derived by difference: 67 total - 1 zero-output = 66 detectable.
 #' Includes the 2 metric features (f_43, f_44). For the pure set of
 #' "features that generate evidence rows", also subtract \code{.metric_features}.
 #'
@@ -156,7 +145,7 @@
 
 #' Features that generate evidence (internal)
 #'
-#' 55 features: detectable - metrics. Each one must satisfy the
+#' 64 features: detectable - metrics. Each one must satisfy the
 #' invariant \code{count == nrow(filter(evidence, feature == X))} when
 #' count > 0, including dictionary and mixed-source detections.
 #'

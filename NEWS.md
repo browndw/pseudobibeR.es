@@ -21,6 +21,83 @@
 
 ## Corrections that change results
 
+- Activated f_61 for bounded resumptive prepositional relatives: nominal que
+  relatives with finite predicate/subject evidence and linked third-person PP
+  under initial hablar-de/depender-de/confiar-en frames. Ordinary subject/object
+  relatives, known agreement conflicts and bare objects are excluded. One
+  relative clause contributes its first matching PP span; detected markers
+  leave f_29/f_30. Pied-piping and other relative bins are unchanged. Exact
+  hablé/confié lookup is local to f_61; source annotations, denominators and
+  lexical metrics are preserved. f_28 is the sole compatibility zero; the
+  French f_61 revision remains a separate follow-up.
+- Activated f_62 for adverb-interrupted preposition-infinitive units. Require
+  a linked verbal infinitive and at least one non-negative adverb; negation-only
+  cases are excluded, while negative ADV/PART can accompany genuine adverbs.
+  Consecutive adverbs are supported without an arbitrary token cap. Subjects,
+  punctuation breaks and nominal infinitives are excluded. Full matched-span
+  evidence/audits, bounded mejor/siquiera lookup and compound/copular links
+  preserve supplied annotations. Other features, denominators and metrics are
+  unchanged; f_24/f_63 overlap is intentional.
+- Activated f_60 as bounded functional complement reduction, not only literal
+  que deletion. Initial creer/pensar/esperar complements qualify when infinitival
+  or unmarked finite, including auxiliary/copular projection and clear
+  coordination. Overt introducers, questions and nominal infinitives are
+  excluded; this is not every infinitive. Clause-head evidence and audits
+  support counts, while f_24 overlap is intentional. Source annotations,
+  other features, denominators and metrics are unchanged. Additional predicates
+  were outside this initial complement implementation.
+- Activated f_59 for recognized colloquial contractions/written reductions:
+  pa forms, onde/nde/onde's/ontas and reduced estar spellings. Surface lookup
+  supports straight/curly apostrophes and native token splits without retagging
+  or expanding words. Each longest expression counts once with full-span
+  evidence/audits. Standard al/del, nominal determiner contexts and short
+  nominal acronyms are excluded; this is not a generic apostrophe detector.
+  Source annotations, other features, denominators and lexical metrics remain
+  unchanged. f_60/f_62 scope decisions and genuine f_61 stranding were separate
+  from this contraction implementation.
+- Activated f_31/f_32 for noun-headed quien/cual relatives in subject/object
+  roles; f_29/f_30 now contain only que relatives. Counts and audits use a
+  shared role partition with exclusive pied-piping f_33 precedence.
+  Bounded checks repair conflicting nsubj assignments and singular-relative/
+  singular-antecedent disagreement with first/second-person plural predicates,
+  protecting coordinated subjects. Relative morphology supports narrow native
+  finite appos-attachment recovery. Roleless que is no longer automatically
+  counted as a subject: recovery requires positive intransitive/locative
+  evidence, or an external subject for an object reading. Ambiguous gaps remain
+  unclassified. Source annotations, denominators, lexical metrics and feature
+  identifiers are unchanged.
+- Activated `f_15_gerunds` for clear noun-like nominal infinitives. Shared
+  occurrence selection combines verb/infinitive identity with nominal structure,
+  excluding internal verbal arguments/modifiers rather than counting endings,
+  articles, or all clausal subjects. Each qualifying word moves out of
+  f_14/f_16/f_24, preventing duplicate counts and audits. Known verb identities
+  support NOUN/PROPN annotations and the native `comer` -> `comero` lemma error
+  without retagging. Nominal subjects recovered from csubj do not license
+  impersonal f_09. Verbal infinitival clauses, supplied token populations and
+  lexical metrics remain unchanged.
+- Activated `f_12_proverb_do` for anaphoric lexical hacer with action-proform
+  lo (including enclitics) or lo mismo. Counts and audits identify the verb once,
+  excluding auxiliary/copular, causative, identifiable reflexive and overt
+  nominal-object contexts. Native split-gerund and compound-enclitic lemmas
+  receive narrow feature-local support. Bare lo remains a structural candidate
+  without semantic antecedent resolution; other proforms are deferred.
+  All other features, token populations and lexical metrics remain unchanged.
+- Activated `f_09_pronoun_it` as a Spanish impersonal/expletive predicate
+  measure rather than a compatibility zero. Weather constructions and
+  selected impersonal clausal constructions generate one audited occurrence
+  per real predicate word. A closed root-weather-form rule handles known native
+  parser mistaggings without altering annotations. No null subjects or empty
+  nodes are invented; existential haber remains in f_20. Personal pro-drop,
+  generic complements, ambiguous se, and neuter lo are excluded from this
+  baseline. Other feature counts, token populations, and lexical metrics
+  remain unchanged.
+- Synthetic negation retains the approved negative lexical inventory and
+  per-word concord counts. Ordinary nominal uses with a preceding dependent
+  article, including mis-tagged `la nada` and `un nadie`, no longer count.
+  A guarded fallback recognizes verbal-subject `nadie` mis-tagged PROPN by
+  native spaCy. Original token annotations and occurrence order are preserved;
+  all other features, analytic audits, denominators, and lexical metrics are
+  unchanged. Idiom disambiguation and new classes such as `sin` remain deferred.
 - Total adverbs (`f_42_adverbs`) now follows Biber's exclusion definition:
   ADV occurrences counted as place/time adverbials, downtoners, hedges, or
   amplifiers are excluded. The union of actual detections and full phrase spans

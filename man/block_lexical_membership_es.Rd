@@ -4,7 +4,12 @@
 \alias{block_lexical_membership_es}
 \title{Demonstrative pronoun, nominalization, and noun features (Spanish)}
 \usage{
-block_lexical_membership_es(tokens, doc_ids, word_lists_lookup)
+block_lexical_membership_es(
+  tokens,
+  doc_ids,
+  word_lists_lookup,
+  nominal_infinitives
+)
 }
 \arguments{
 \item{tokens}{Annotated token data frame}
@@ -12,18 +17,17 @@ block_lexical_membership_es(tokens, doc_ids, word_lists_lookup)
 \item{doc_ids}{One-column data frame with column \code{doc_id}}
 
 \item{word_lists_lookup}{Word lists lookup}
+
+\item{nominal_infinitives}{Shared noun-like infinitive rows}
 }
 \value{
-Data frame with f_10, f_14, f_16, f_51
+Block result with f_10, f_14-f_16, f_51
 }
 \description{
 f_10  Pronombres demostrativos (este, ese, aquel + formas)
 f_14  Nominalizaciones (sustantivos con sufijos productivos)
-f_15  ELIMINADO (intraducible): el gerundio espanol no funciona como
-sustantivo; las funciones nominales del -ing ingles se realizan
-mediante infinitivos (f_24) y nominalizaciones (f_14).
-biber_espanol_completo.md sec. F_15.
-f_16  Otros sustantivos (= total NOUN/PROPN - f_14; sin resta de f_15)
+f_15  Infinitivos claramente sustantivados
+f_16  Otros sustantivos (excluye ocurrencias de f_14 y f_15)
 f_51  Demostrativos determinantes (mismo este/ese/aquel en funcion DET)
 }
 \keyword{internal}

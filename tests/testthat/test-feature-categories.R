@@ -42,9 +42,18 @@ test_that(".feature_categories cubre cada columna f_NN_ del output de biber()", 
                info = "categorias asignadas a rasgos que no existen en biber()")
 })
 
-test_that(".zero_output_features tiene los 10 esperados y todos estan en .feature_categories", {
-  expect_length(zero_out, 10L)
+test_that(".zero_output_features tiene el 1 esperado y esta en .feature_categories", {
+  expect_length(zero_out, 1L)
   expect_true(all(zero_out %in% names(cats)))
+  expect_false("f_09_pronoun_it" %in% zero_out)
+  expect_false("f_12_proverb_do" %in% zero_out)
+  expect_false("f_15_gerunds" %in% zero_out)
+  expect_false("f_31_wh_subj" %in% zero_out)
+  expect_false("f_32_wh_obj" %in% zero_out)
+  expect_false("f_59_contractions" %in% zero_out)
+  expect_false("f_60_that_deletion" %in% zero_out)
+  expect_false("f_62_split_infinitive" %in% zero_out)
+  expect_false("f_61_stranded_preposition" %in% zero_out)
 })
 
 test_that(".metric_features cubre f_43 y f_44", {
@@ -52,14 +61,23 @@ test_that(".metric_features cubre f_43 y f_44", {
   expect_true(all(metric_feats %in% names(cats)))
 })
 
-test_that(".detectable_features = 67 - 10 zero-output = 57", {
-  expect_length(detectable, 57L)
+test_that(".detectable_features = 67 - 1 zero-output = 66", {
+  expect_length(detectable, 66L)
   expect_true(all(detectable %in% names(cats)))
   expect_equal(length(intersect(detectable, zero_out)), 0L)
 })
 
-test_that(".evidence_features = detectable - metricas = 55", {
-  expect_length(evidence_pool, 55L)
+test_that(".evidence_features = detectable - metricas = 64", {
+  expect_length(evidence_pool, 64L)
+  expect_true("f_09_pronoun_it" %in% evidence_pool)
+  expect_true("f_12_proverb_do" %in% evidence_pool)
+  expect_true("f_15_gerunds" %in% evidence_pool)
+  expect_true("f_31_wh_subj" %in% evidence_pool)
+  expect_true("f_32_wh_obj" %in% evidence_pool)
+  expect_true("f_59_contractions" %in% evidence_pool)
+  expect_true("f_60_that_deletion" %in% evidence_pool)
+  expect_true("f_62_split_infinitive" %in% evidence_pool)
+  expect_true("f_61_stranded_preposition" %in% evidence_pool)
   expect_equal(length(intersect(evidence_pool, metric_feats)), 0L)
   expect_equal(length(intersect(evidence_pool, zero_out)),     0L)
 })
@@ -97,6 +115,6 @@ test_that(".dict_only_features tiene los 6 esperados (categoria K)", {
   expect_true(all(grepl("^K\\.", cats[dict_only])))
 })
 
-test_that(".strict_evidence_features = 55 - 2 - 6 = 47", {
-  expect_length(strict_ev, 47L)
+test_that(".strict_evidence_features = 64 - 2 - 6 = 56", {
+  expect_length(strict_ev, 56L)
 })

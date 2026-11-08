@@ -4,7 +4,14 @@
 \alias{block_relatives_es}
 \title{Relative clause features (Spanish)}
 \usage{
-block_relatives_es(tokens, doc_ids, head_lookup)
+block_relatives_es(
+  tokens,
+  doc_ids,
+  head_lookup,
+  subject_intransitives,
+  resumptive_frames,
+  resumptive_first_person_forms
+)
 }
 \arguments{
 \item{tokens}{Annotated token data frame}
@@ -12,18 +19,23 @@ block_relatives_es(tokens, doc_ids, head_lookup)
 \item{doc_ids}{One-column data frame with column \code{doc_id}}
 
 \item{head_lookup}{Pre-built head-token attribute table}
+
+\item{subject_intransitives}{Known intransitive predicates supporting roleless que}
+
+\item{resumptive_frames}{Initial predicate-preposition frames for f_61}
+
+\item{resumptive_first_person_forms}{Unambiguous first-person surface lookup pairs}
 }
 \value{
-Data frame: one row per doc, columns f_29 - f_34
+Data frame: one row per doc, columns f_29 - f_34 and f_61
 }
 \description{
-Estrategia UD pura:
-\itemize{
-\item Clausulas relativas = tokens con dep_rel que comienza por "acl"
-(acl, acl:relcl) cuyo marcador (dep_rel=mark o ref) es un pronombre
-relativo o wh.
-\item Tipo de relativa (sujeto/objeto) se determina por la funcion UD
-del pronombre relativo dentro de la clausula subordinada.
-}
+Nominal relatives are partitioned by marker family and grammatical role.
+Explicit roles receive bounded subject-conflict and agreement checks.
+Roleless que requires an external subject or positive intransitive/locative
+evidence; ambiguous gaps are not assigned to the subject bin by default.
+Detected resumptive que occurrences leave the ordinary gap bins under f_61;
+existing pied-piping and sentential-relative precedence is retained.
+Pied-piping takes precedence over all other relative categories.
 }
 \keyword{internal}

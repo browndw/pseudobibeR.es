@@ -64,16 +64,103 @@ one spaCy token counts once, whereas supplied UD component words count
 separately. The extractor does not infer a missing decomposition.
 
 The usual output has 67 feature columns. `measure = "none"` omits lexical
-diversity. MATTR is the default; if any document has fewer than 200 surface
-tokens, including punctuation, the whole supplied corpus uses TTR, with one
-message. Thus, every document contributes a value from the same measure.
+diversity. Its types are lower-case surface forms with parser tags appended,
+not lemmas. Fine-grained tags are retained; missing or `_` tags use UPOS.
+Punctuation, symbols, and spaces are excluded by UD POS, and the English
+numeric pattern `\d_` removes numeric matches from the tagged stream.
+Spelled-out numerals remain words; dictionary expressions are not compounded.
+
+MATTR is the default; if any document has fewer than 200 retained diversity
+tokens, the whole supplied corpus uses TTR, with one message. The threshold
+population therefore differs from `n_tokens`, which includes number words.
+Thus, each document's value is calculated using the same selected measure.
 Explicitly selected TTR, CTTR, and MSTTR are retained throughout the corpus.
 For MSTTR, `quanteda.textstats` may shorten its common segment length and warns.
 Supply the complete corpus together rather than processing documents
 independently when relying on automatic fallback. For multivariate analysis,
 use the same measure across all compared corpora before scaling.
+Documents with no retained diversity tokens receive `NA` for f_43 and an
+identifying warning, rather than a fabricated score.
 
-Ten columns are zero by compatibility convention, not measured absences.
+f_28 is zero by compatibility convention, not a measured absence.
+`f_59_contractions` counts a bounded inventory of colloquial written reductions,
+not ordinary `al/del` or every apostrophe. Surface/span lookup supports `pa`
+forms, `onde/nde/onde's/ontas` and reduced `estar` forms despite inconsistent
+native tags and lemmas. Each longest recognized expression counts once:
+`Ontas? Ven pa’ca’rriba` gives two occurrences. Nominal determiner contexts
+and short nominal acronyms are excluded. Supplied annotations and word-token
+populations are unchanged, so model-dependent apostrophe/fragment tags can
+still affect normalization.
+
+`f_60_that_deletion` is a functional complement-reduction analogue, not only
+literal `que` omission. Under the initial creer/pensar/esperar inventory,
+infinitival complements (`Pienso ir`, `Creo haber entendido`) and unmarked
+finite complements (`Nosotros esperamos lleguen mañana`) count once per
+identified clause head. Clear coordinated complements and auxiliary/copular
+forms are supported; overt introducers, indirect questions and nominal
+infinitives are excluded. `Puedo ir` is not a qualifying lexical complement.
+Overlap with f_24 is intentional: infinitive form and complement-reduction
+function are different dimensions. This neither reconstructs deletion nor
+establishes identical meanings/registers across languages. Supplied annotations
+and denominators remain unchanged, and missed predicate/complement analyses
+can produce zeros.
+
+`f_62_split_infinitive` measures an adverb interrupting a linked
+preposition–verbal-infinitive unit: `Trato de realmente comprender` qualifies,
+but `Trato de comprender realmente` does not. Each full matched span counts
+once, anchored at the preposition. Consecutive adverbs are supported; subjects,
+punctuation and nominal infinitives are excluded. A non-negative adverb is
+required: `para no volver` is excluded, but `para no realmente volver` qualifies.
+This intentionally differs from negation-inclusive companion heuristics.
+Bounded mejor/siquiera lookup and linked auxiliary/copular forms are supported
+without rewriting supplied annotations. Missing marker/adverb attachments can
+produce zeros; proximity alone is insufficient. f_24 and legitimate f_63
+overlap remain independent.
+
+`f_61_stranded_preposition` measures the Spanish resumptive counterpart of
+English stranding: `el chico que hablé de él`, competing with pied-piping
+`el chico del que hablé`. Initial hablar-de/depender-de/confiar-en frames
+require a finite nominal que relative, first/second-person or separate-subject
+evidence, and a postverbal linked él/ella/ellos/ellas PP with no known agreement
+conflict or bare direct object. `el chico que habló de él` and ordinary object
+relatives with unrelated PPs do not qualify. One relative construction counts
+once, with its first matching PP span in audits. Detected markers leave the
+f_29/f_30 gap bins; pied-piping and other relative bins are unchanged.
+Unambiguous hablé/confié lookup handles known native errors without rewriting
+annotations. Other frames, gender/coreference ambiguities and model errors
+remain outside this bounded baseline. French's f_61 review is recorded but
+no companion detector is changed here.
+Nominal relatives are partitioned by marker family and role: `que` subject/object
+in f_29/f_30, and `quien/cual` forms in f_31/f_32. An article before `que`
+does not change its marker family. Pied-piping f_33 takes exclusive precedence;
+free relatives, indirect questions and sentential relatives are separate scopes.
+Bounded subject-conflict/agreement checks and relative-morphology-based native
+attachment recovery do not rewrite input annotations. Roleless `que` needs
+positive intransitive/locative predicate evidence or an external subject,
+not just absence of another subject. Unresolved gaps can produce zero despite
+a genuine relative clause, so parser-based totals are not exhaustive.
+The family bins are language-sensitive; pooling f_29+f_31 and f_30+f_32 gives
+detected non-pied-piping subject/object relatives, not all relative clauses.
+`f_15_gerunds` counts clear noun-like nominal infinitives, such as `el saber`
+or `el buen comer`, with nominal internal structure and verified infinitive/verb
+identity. Articles alone or bare infinitival subjects are not sufficient.
+Qualifying words are excluded from f_14/f_16 noun counts and f_24 verbal
+infinitives by occurrence identity; the same shared selection prevents nominal
+subjects from licensing impersonal f_09. Noun-tagged forms without infinitive
+morphology need a known verb identity, not merely an `-ar/-er/-ir` ending.
+Source annotations, word-token populations and lexical metrics are unchanged.
+`f_12_proverb_do` counts lexical anaphoric `hacer` with action-proform `lo`
+(including enclitics) or `lo mismo`, once on the supplied verb word.
+Auxiliary/copular, causative, identifiable reflexive and overt nominal-object
+uses are excluded; pronoun/noun counts remain independent of pro-verb counts. Bare `lo hizo`
+is a structural candidate, not semantic resolution of a distant antecedent.
+`f_09_pronoun_it` counts identified impersonal predicates, not null
+pronouns: `Llueve`, `Es importante descansar`, and `Parece que vendrá` each
+contribute one occurrence on the existing predicate word. Weather and selected
+impersonal clausal rules reject overt nominal subjects and generic personal
+pro-drop. Existential `haber` remains in f_20; ambiguous `se` and neuter `lo`
+are outside this baseline. Supplied word-token denominators are unchanged;
+UD empty nodes are not counted.
 Language-specific constructions, parser errors, and lexical inventories mean
 that identical column names do not guarantee cross-language equivalence.
 Do not interpret scores against English factor norms as validated Spanish scores.
