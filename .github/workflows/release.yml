@@ -53,11 +53,6 @@ jobs:
         rcmdcheck::rcmdcheck(args = c("--no-manual", "--as-cran"), error_on = "warning", check_dir = "check")
       shell: Rscript {0}
         
-    - name: Build vignettes
-      run: |
-        devtools::build_vignettes()
-      shell: Rscript {0}
-        
     - name: Build source package
       run: |
         status <- system("R CMD build .")
