@@ -172,15 +172,16 @@ block_tense_es <- function(
     count_feature_traced("f_02_perfect_aspect")
 
   # -- f_03  Present tense ---------------------------------------------------
-  # Simple present indicative (Tense=Pres, Mood=Ind, VerbForm=Fin).
-  # Does not include the present subjunctive (Mood=Sub) or the non-finite
-  # forms (infinitive, gerund, participle).
+  # Finite present-tense VERB/AUX (Tense=Pres, VerbForm=Fin) in the indicative
+  # or subjunctive, parallel to f_01 and to English VBZ/VBP: the present
+  # subjunctive counts. Conditional and imperative are not present tense (some
+  # models mark the conditional Tense=Pres); conditionals are f_54.
   f03 <- tokens %>%
     dplyr::filter(
       .data$pos %in% c("VERB", "AUX"),
       dplyr::coalesce(extract_feat(.data$feats, "Tense"),    "") == "Pres",
-      dplyr::coalesce(extract_feat(.data$feats, "Mood"),     "") == "Ind",
-      dplyr::coalesce(extract_feat(.data$feats, "VerbForm"), "") == "Fin"
+      dplyr::coalesce(extract_feat(.data$feats, "VerbForm"), "") == "Fin",
+      !dplyr::coalesce(extract_feat(.data$feats, "Mood"), "") %in% c("Cnd", "Imp")
     ) %>%
     count_feature_traced("f_03_present_tense")
 
@@ -206,11 +207,6 @@ block_tense_es <- function(
   # articles (DET, PronType=Art), not pronouns. UDPipe lemmatizes them as
   # "uno"; the PronType!=Art filter discards the article and keeps the
   # pronominal use (uno PRON PronType=Ind).
-  # NOTE: count_feature_traced uses the name "f_11_indefinite_pronoun"
-  # (without the final 's') because parse_biber_features() renames it to
-  # f_11_indefinite_pronouns later. We do the same here to
-  # keep parity. The evidence is labeled with the same name and
-  # relabeled in parse_biber_features after the rename.
   # HERNAN REVIEW (Phase 4): syntactic control. Only the INDEPENDENT nominal
   # (pronominal) function counts. The DETERMINER use is excluded
   # (dep_rel=det: 'todo el dia', 'cualquier libro', 'algun caso'), which is not
@@ -225,7 +221,7 @@ block_tense_es <- function(
       !stringr::str_detect(dplyr::coalesce(.data$feats, ""), "PronType=Art"),
       !stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^det($|:)")
     ) %>%
-    count_feature_traced("f_11_indefinite_pronoun")
+    count_feature_traced("f_11_indefinite_pronouns")
 
   # -- Assemble counts -------------------------------------------------------
   counts <- doc_ids %>%

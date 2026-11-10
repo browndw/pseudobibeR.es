@@ -8,7 +8,7 @@ diversity_tokens <- function(doc_id, words) {
 test_that("default MATTR falls back once to TTR for the entire corpus", {
   long <- diversity_tokens("z_long", c(rep("libro", 120), rep("texto", 120)))
   short <- diversity_tokens("a_short", c("libro", "texto"))
-  expect_message(alone <- biber(long, normalize = FALSE), NA)
+  expect_message(alone <- biber_fixture(long, normalize = FALSE), NA)
   expect_equal(alone$f_43_type_token, 4 / 235)
 
   tokens <- rbind(long, short)
@@ -18,7 +18,7 @@ test_that("default MATTR falls back once to TTR for the entire corpus", {
     for (normalize in c(FALSE, TRUE)) {
       messages <- character()
       result <- withCallingHandlers(
-        biber(input, normalize = normalize),
+        biber_fixture(input, normalize = normalize),
         message = function(condition) {
           messages <<- c(messages, conditionMessage(condition))
           invokeRestart("muffleMessage")
@@ -30,7 +30,7 @@ test_that("default MATTR falls back once to TTR for the entire corpus", {
     }
   }
   expect_message(
-    explicit <- biber(tokens, measure = "MATTR", normalize = FALSE),
+    explicit <- biber_fixture(tokens, measure = "MATTR", normalize = FALSE),
     "Setting type-to-token ratio to TTR"
   )
   expect_equal(explicit$f_43_type_token, c(2 / 240, 1))
@@ -40,11 +40,11 @@ test_that("the MATTR fallback threshold is strictly below 200 diversity tokens",
   short <- diversity_tokens("short", c(rep("libro", 100), rep("texto", 99)))
   boundary <- diversity_tokens("boundary", c(rep("libro", 100), rep("texto", 100)))
   expect_message(
-    below <- biber(short, normalize = FALSE),
+    below <- biber_fixture(short, normalize = FALSE),
     "Setting type-to-token ratio to TTR"
   )
   expect_equal(below$f_43_type_token, 2 / 199)
-  expect_message(at <- biber(boundary, normalize = FALSE), NA)
+  expect_message(at <- biber_fixture(boundary, normalize = FALSE), NA)
   expect_equal(at$f_43_type_token, 2 / 101)
 
   punctuation <- boundary
@@ -53,20 +53,21 @@ test_that("the MATTR fallback threshold is strictly below 200 diversity tokens",
   punctuation$dep_rel[200] <- "punct"
   punctuation$head_token_id[200] <- "199"
   expect_message(
-    with_punctuation <- biber(punctuation, normalize = FALSE),
+    with_punctuation <- biber_fixture(punctuation, normalize = FALSE),
     "Setting type-to-token ratio to TTR"
   )
-  expect_equal(with_punctuation$n_tokens, 199)
+  expect_equal(word_tokens(punctuation), 199)
   expect_equal(with_punctuation$f_43_type_token, 2 / 199)
 
   numbers <- boundary
   numbers$token[200] <- numbers$lemma[200] <- "42"
   numbers$upos[200] <- numbers$xpos[200] <- "NUM"
   expect_message(
-    with_numbers <- biber(numbers, normalize = FALSE),
+    with_numbers <- biber_fixture(numbers, normalize = FALSE),
     "Setting type-to-token ratio to TTR"
   )
-  expect_equal(with_numbers$n_tokens, 200)
+  # Digit-final numerals are excluded from the normalization denominator.
+  expect_equal(word_tokens(numbers), 199)
   expect_equal(with_numbers$f_43_type_token, 2 / 199)
 })
 
@@ -78,11 +79,11 @@ test_that("explicit TTR and CTTR are retained across mixed document lengths", {
   expected <- list(TTR = c(2 / 240, 1), CTTR = c(2 / sqrt(480), 1))
   for (measure in names(expected)) {
     expect_message(
-      result <- biber(tokens, measure = measure, normalize = FALSE), NA
+      result <- biber_fixture(tokens, measure = measure, normalize = FALSE), NA
     )
     expect_equal(result$f_43_type_token, expected[[measure]])
   }
-  expect_message(omitted <- biber(tokens, measure = "none"), NA)
+  expect_message(omitted <- biber_fixture(tokens, measure = "none"), NA)
   expect_false("f_43_type_token" %in% names(omitted))
 })
 
@@ -92,7 +93,7 @@ test_that("explicit MSTTR uses common corpus settings without switching to TTR",
     diversity_tokens("short", c("libro", "texto"))
   )
   expect_warning(
-    result <- biber(tokens, measure = "MSTTR", normalize = FALSE),
+    result <- biber_fixture(tokens, measure = "MSTTR", normalize = FALSE),
     "MSTTR_segment.*resetting to 2"
   )
   expect_equal(result$f_43_type_token, c(0.5, 1))
@@ -103,7 +104,7 @@ test_that("lexical diversity retains first-appearance order beyond nine document
     diversity_tokens(paste0("doc_", 13 - i), rep(c("libro", "texto"), i))
   })
   expect_message(
-    result <- biber(do.call(rbind, documents), measure = "CTTR", normalize = FALSE),
+    result <- biber_fixture(do.call(rbind, documents), measure = "CTTR", normalize = FALSE),
     NA
   )
   expect_equal(result$doc_id, paste0("doc_", 12:1))

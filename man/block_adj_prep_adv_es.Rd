@@ -4,13 +4,7 @@
 \alias{block_adj_prep_adv_es}
 \title{Adjective, preposition, and adverb features (Spanish)}
 \usage{
-block_adj_prep_adv_es(
-  tokens,
-  doc_ids,
-  dict_lookup,
-  word_lists_lookup,
-  negation_adverbs
-)
+block_adj_prep_adv_es(tokens, doc_ids, dict_lookup, word_lists_lookup)
 }
 \arguments{
 \item{tokens}{Annotated token data frame}
@@ -20,8 +14,6 @@ block_adj_prep_adv_es(
 \item{dict_lookup}{Dictionary lookup (yaml list loaded by parse_functions)}
 
 \item{word_lists_lookup}{Word lists lookup}
-
-\item{negation_adverbs}{Character vector of negation adverb lemmas}
 }
 \value{
 Data frame: one row per doc, columns f_39 - f_42

@@ -1,0 +1,28 @@
+# Display names for Spanish output columns (shared identifier: display name).
+# Detectors, evidence, tests and CROSS_LANGUAGE_ALIGNMENT.md use the shared
+# identifiers; biber() and audit_features() show these names unless
+# feature_names = "shared". Each display name keeps its f_NN_ number, which is
+# the same feature in every package of the family. Features not listed keep
+# the shared name. Rebuild with: Rscript data-raw/build_feature_names.R
+f_09_pronoun_it: f_09_impersonal
+f_12_proverb_do: f_12_proverb_hacer
+f_15_gerunds: f_15_nominal_infinitives
+f_18_by_passives: f_18_agent_passives
+f_19_be_main_verb: f_19_copula_main_verb
+f_20_existential_there: f_20_existential
+f_21_that_verb_comp: f_21_que_verb_comp
+f_22_that_adj_comp: f_22_que_adj_comp
+f_25_present_participle: f_25_gerund_clause
+f_27_past_participle_whiz: f_27_past_participle_reduced_relative
+# Always 0: the postnominal (specifying) gerund is not standard Spanish (D-35).
+f_28_present_participle_whiz: f_28_gerund_reduced_relative
+f_29_that_subj: f_29_que_subj
+f_30_that_obj: f_30_que_obj
+f_31_wh_subj: f_31_quien_cual_subj
+f_32_wh_obj: f_32_quien_cual_obj
+f_35_because: f_35_causal
+f_36_though: f_36_concessive
+f_37_if: f_37_conditional
+f_59_contractions: f_59_reduced_forms
+f_60_that_deletion: f_60_reduced_complement
+f_61_stranded_preposition: f_61_resumptive_relative

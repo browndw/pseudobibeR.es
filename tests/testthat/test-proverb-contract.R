@@ -13,11 +13,11 @@ proverb_texts <- function() {
 }
 
 expect_proverb_baseline <- function(tokens) {
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expected <- c(1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1)
   expect_equal(raw$doc_id, names(proverb_texts()))
   expect_equal(raw$f_12_proverb_do, expected)
-  audit <- audit_features(tokens, feature = "f_12_proverb_do")
+  audit <- audit_fixture(tokens, feature = "f_12_proverb_do")
   expect_equal(tabulate(match(audit$doc_id, raw$doc_id), nbins = nrow(raw)), expected)
   expect_true(all(tolower(audit$keyword) %in%
                     c("hizo", "hacer", "hacerlo", "haci\u00e9ndo", "haci\u00e9ndolo")))
@@ -33,12 +33,12 @@ test_that("f_12 counts the lexical predicate, preserving pronouns and word popul
   class(spacy) <- c("spacyr_parsed", "data.frame")
   original <- tokens
   for (input in list(tokens, spacy)) {
-    raw <- biber(input, measure = "none", normalize = FALSE)
+    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
     expect_equal(raw$f_12_proverb_do, 1)
     expect_equal(raw$f_08_third_person_pronouns, 1)
-    expect_equal(raw$n_tokens, 2)
-    expect_equal(biber(input, measure = "none")$f_12_proverb_do, 500)
-    expect_equal(audit_features(input, feature = "f_12_proverb_do")$keyword, "hizo")
+    expect_equal(word_tokens(input), 2)
+    expect_equal(biber_fixture(input, measure = "none")$f_12_proverb_do, 500)
+    expect_equal(audit_fixture(input, feature = "f_12_proverb_do")$keyword, "hizo")
   }
   expect_identical(tokens, original)
 })
@@ -74,7 +74,7 @@ test_that("f_12 excludes auxiliary/copular, causative, reflexive and nominal-obj
   feminine <- base
   feminine$doc_id <- "feminine"
   feminine$token[1] <- "La"
-  raw <- biber(rbind(auxiliary, copular, causative, reflexive, nominal, feminine),
+  raw <- biber_fixture(rbind(auxiliary, copular, causative, reflexive, nominal, feminine),
                measure = "none", normalize = FALSE)
   expect_equal(raw$f_12_proverb_do, rep(0, 6))
   expect_equal(raw$f_16_other_nouns[raw$doc_id == "nominal"], 1)
@@ -92,9 +92,9 @@ test_that("split and integrated enclitics recover only the approved hacer repres
   different$doc_id <- "different"
   different$token <- "verlo"
   different$lemma <- "ver \u00e9l"
-  raw <- biber(rbind(integrated, gerund, different), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(integrated, gerund, different), measure = "none", normalize = FALSE)
   expect_equal(raw$f_12_proverb_do, c(1, 1, 0))
-  expect_equal(raw$n_tokens, c(1, 2, 1))
+  expect_equal(word_tokens(rbind(integrated, gerund, different)), c(1, 2, 1))
 })
 
 test_that("lo mismo is action-proform evidence, not an instruction to consume its noun", {
@@ -103,13 +103,13 @@ test_that("lo mismo is action-proform evidence, not an instruction to consume it
     c("VERB", "PRON", "NOUN"), c(0, 3, 1), c("root", "det", "obj"),
     c("VerbForm=Fin", NA, NA)
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_12_proverb_do, 1)
   expect_equal(raw$f_14_nominalizations + raw$f_16_other_nouns, 1)
-  expect_equal(audit_features(tokens, feature = "f_12_proverb_do")$keyword, "hizo")
+  expect_equal(audit_fixture(tokens, feature = "f_12_proverb_do")$keyword, "hizo")
   duplicate <- rbind(tokens, contract_clause("same", "lo", "\u00e9l", "PRON", 1, "obj"))
   duplicate$token_id[4] <- "4"
-  expect_equal(biber(duplicate, measure = "none", normalize = FALSE)$f_12_proverb_do, 1)
+  expect_equal(biber_fixture(duplicate, measure = "none", normalize = FALSE)$f_12_proverb_do, 1)
 })
 
 test_that("proverb links tolerate word-ID gaps and remain document/sentence-local", {
@@ -118,15 +118,15 @@ test_that("proverb links tolerate word-ID gaps and remain document/sentence-loca
     c(7, 0), c("obj", "root"), c(NA, "VerbForm=Fin")
   )
   tokens$token_id <- c("2", "7")
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_12_proverb_do, 1)
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_12_proverb_do, 1)
   tokens$sentence_id[1] <- 2L
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_12_proverb_do, 0)
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_12_proverb_do, 0)
   tokens$sentence_id <- 1L
   tokens$doc_id[1] <- "unrelated"
-  expect_true(all(biber(tokens, measure = "none", normalize = FALSE)$f_12_proverb_do == 0))
+  expect_true(all(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_12_proverb_do == 0))
   tokens$doc_id <- "gap"
   tokens$token_id[1] <- "7.1"
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_12_proverb_do, 0)
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_12_proverb_do, 0)
 })
 
 test_that("Spanish-GSD recognizes the bounded pro-verb baseline", {
@@ -142,7 +142,7 @@ test_that("shipped Spanish f_12 examples include a pro-verb and a causative cont
   tokens <- udpipe::udpipe_annotate(
     .fc_ud(), x = examples$example, doc_id = paste0("example_", seq_len(nrow(examples)))
   )
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_12_proverb_do,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_12_proverb_do,
                examples$count)
 })
 test_that("live Spanish spaCy recognizes the same pro-verb baseline", {

@@ -53,21 +53,21 @@ test_that("perfect aspect counts haber compounds, not progressive or modal chain
   )
   clauses[[6]]$feats[3] <- "VerbForm=Part|Voice=Pass"
   tokens <- do.call(rbind, clauses)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expected <- c(1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1)
   expect_equal(raw$doc_id, vapply(clauses, function(x) x$doc_id[1], character(1)))
   expect_equal(raw$f_02_perfect_aspect, expected)
 
-  audit <- audit_features(tokens, feature = "f_02_perfect_aspect")
+  audit <- audit_fixture(tokens, feature = "f_02_perfect_aspect")
   expect_equal(tabulate(match(audit$doc_id, raw$doc_id), nbins = nrow(raw)), expected)
   expect_equal(audit$keyword, ifelse(audit$doc_id == "nested_modal", "haber", "ha"))
-  expect_equal(biber(tokens, measure = "none")$f_02_perfect_aspect,
-               1000 * expected / raw$n_tokens)
+  expect_equal(biber_fixture(tokens, measure = "none")$f_02_perfect_aspect,
+               1000 * expected / word_tokens(tokens))
 
   spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
   spacy$dep_rel[spacy$dep_rel == "aux:pass"] <- "auxpass"
   class(spacy) <- c("spacyr_parsed", "data.frame")
-  expect_equal(biber(spacy, measure = "none", normalize = FALSE)$f_02_perfect_aspect,
+  expect_equal(biber_fixture(spacy, measure = "none", normalize = FALSE)$f_02_perfect_aspect,
                expected)
 })
 
@@ -77,11 +77,11 @@ test_that("perfect complements stay within their sentence and document", {
   first$sentence_id <- c(1L, 2L)
   second <- first
   second$doc_id <- c("second", "third")
-  raw <- biber(rbind(first, second), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(first, second), measure = "none", normalize = FALSE)
   expect_equal(raw$f_02_perfect_aspect, c(0, 0, 0))
 })
 
-test_that("finite past and present rules distinguish mood and nonfinite forms", {
+test_that("finite past and present rules count every mood but exclude nonfinite forms", {
   feats <- c(
     "Mood=Ind|Tense=Past|VerbForm=Fin", "Mood=Ind|Tense=Imp|VerbForm=Fin",
     "Mood=Sub|Tense=Imp|VerbForm=Fin", "Mood=Ind|Tense=Pqp|VerbForm=Fin",
@@ -94,11 +94,12 @@ test_that("finite past and present rules distinguish mood and nonfinite forms", 
     x$feats[2] <- feats[i]
     x
   }))
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_01_past_tense, c(rep(1, 4), rep(0, 7)))
-  expect_equal(raw$f_03_present_tense, c(rep(0, 4), 1, rep(0, 6)))
+  # The present subjunctive counts in f_03, as the imperfect subjunctive does in f_01.
+  expect_equal(raw$f_03_present_tense, c(rep(0, 4), 1, 1, rep(0, 5)))
   for (feature in c("f_01_past_tense", "f_03_present_tense")) {
-    audit <- audit_features(tokens, feature = feature)
+    audit <- audit_fixture(tokens, feature = feature)
     expect_equal(tabulate(match(audit$doc_id, raw$doc_id), nbins = nrow(raw)),
                  raw[[feature]])
   }
@@ -119,12 +120,12 @@ test_that("personal pronouns and possessives retain the documented person routin
               "Person=3|Reflex=Yes", "PronType=Art"),
     head_token_id = "0", dep_rel = "dep"
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   features <- c("f_06_first_person_pronouns", "f_07_second_person_pronouns",
                 "f_08_third_person_pronouns")
   expect_equal(as.numeric(raw[1, features]), c(3, 3, 2))
   for (feature in features) {
-    audit <- audit_features(tokens, feature = feature)
+    audit <- audit_fixture(tokens, feature = feature)
     expect_equal(sum(audit$count), raw[[feature]])
   }
   expect_equal(raw$f_09_pronoun_it, 0)
@@ -140,9 +141,9 @@ test_that("indefinite pronouns exclude articles, adjectives, and determiner subt
               "PronType=Ind", "PronType=Ind", "PronType=Ind"),
     head_token_id = "0", dep_rel = c("obj", "det", "amod", "det", "det:predet", "nsubj")
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_11_indefinite_pronouns, c(1, 0, 0, 0, 0, 1))
-  audit <- audit_features(tokens, feature = "f_11_indefinite_pronouns")
+  audit <- audit_fixture(tokens, feature = "f_11_indefinite_pronouns")
   expect_equal(audit$keyword, c("uno", "alguien"))
 })
 
@@ -153,10 +154,10 @@ test_that("demonstrative pronouns do not count as demonstrative determiners", {
     upos = c("PRON", "PRON", "DET"), xpos = "X", feats = "PronType=Dem",
     head_token_id = "0", dep_rel = c("nsubj", "obj", "det")
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_10_demonstrative_pronoun, 2)
   expect_equal(raw$f_51_demonstratives, 1)
-  expect_equal(sum(audit_features(tokens, feature = "f_10_demonstrative_pronoun")$count), 2)
+  expect_equal(sum(audit_fixture(tokens, feature = "f_10_demonstrative_pronoun")$count), 2)
 })
 
 test_that("Spanish-GSD preserves the validated aspect contrasts", {
@@ -170,11 +171,11 @@ test_that("Spanish-GSD preserves the validated aspect contrasts", {
     stative = "La puerta est\u00e1 cerrada."
   )
   tokens <- udpipe::udpipe_annotate(model, x = texts, doc_id = names(texts))
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$doc_id, names(texts))
   expect_equal(raw$f_02_perfect_aspect, c(0, 1, 1, 1, 0, 0))
   expect_equal(raw$f_01_past_tense, c(0, 0, 0, 1, 0, 0))
-  audit <- audit_features(tokens, feature = "f_02_perfect_aspect")
+  audit <- audit_fixture(tokens, feature = "f_02_perfect_aspect")
   expect_equal(audit$keyword, ifelse(audit$doc_id == "pluperfect", "hab\u00eda", "ha"))
   expect_equal(sum(audit$count), 3)
 })

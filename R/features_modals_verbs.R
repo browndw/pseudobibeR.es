@@ -133,11 +133,9 @@ expand_adjective_conjuncts <- function(tokens, rows) {
 #' @param doc_ids One-column data frame with column `doc_id`
 #' @param dict_lookup Dictionary lookup (yaml list loaded by parse_functions)
 #' @param word_lists_lookup Word lists lookup
-#' @param negation_adverbs Character vector of negation adverb lemmas
 #' @return Data frame: one row per doc, columns f_39 - f_42
 #' @keywords internal
-block_adj_prep_adv_es <- function(tokens, doc_ids, dict_lookup,
-                                   word_lists_lookup, negation_adverbs) {
+block_adj_prep_adv_es <- function(tokens, doc_ids, dict_lookup, word_lists_lookup) {
 
   # f_39  Prepositions -- total count of ADP tokens (Biber 1985 counts them
   # all as a measure of nominal/informational density). UDPipe spanish-gsd

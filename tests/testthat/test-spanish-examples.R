@@ -1,8 +1,8 @@
 # test-spanish-examples.R
-# Examples labeled by feature, validated against biber() via UDPipe.
+# Examples labeled by feature, validated against biber_fixture() via UDPipe.
 #
 # Loads data-raw/spanish_examples.yaml (one row per example with feature/example/count),
-# parses each sentence with the UD spanish-gsd model, runs biber(normalize = FALSE)
+# parses each sentence with the UD spanish-gsd model, runs biber_fixture(normalize = FALSE)
 # and compares the observed count with the expected one.
 #
 # Some features diverge occasionally between parsers or need discourse context:
@@ -75,7 +75,7 @@ test_that("UDPipe spanish examples align with expected feature counts", {
     parser = "default"
   )
 
-  feature_counts <- biber(annotations, measure = "none", normalize = FALSE)
+  feature_counts <- biber_fixture(annotations, measure = "none", normalize = FALSE)
 
   missing_columns <- character()
 

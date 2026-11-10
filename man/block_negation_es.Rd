@@ -9,7 +9,6 @@ block_negation_es(
   doc_ids,
   neg_synthetic_terms,
   negation_part_lemmas,
-  negation_adverbs = NULL,
   nominal_no_modifiers = get_word_list(pseudobibeR.es::word_lists,
     "neg_nominal_no_modifiers")
 )
@@ -23,8 +22,6 @@ block_negation_es(
 coordinator lemmas (ninguno, nadie, nada, nunca, jamas, tampoco, ni).}
 
 \item{negation_part_lemmas}{Lemmas de particulas negativas (no)}
-
-\item{negation_adverbs}{Unused compatibility argument.}
 
 \item{nominal_no_modifiers}{Adjective lemmas used with an article to
 identify nominalized <\if{html}{\out{<no>}}>, such as <\if{html}{\out{<un no rotundo>}}>.}

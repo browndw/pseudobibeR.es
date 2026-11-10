@@ -230,20 +230,23 @@ block_passive_voice_es <- function(tokens, doc_ids, head_lookup,
     count_feature_traced("f_19_be_main_verb")
 
   # -----------------------------------------------------------------------
-  # f_20  Impersonal existential haber (hay, habia, hubo, habra?)
-  #       Condition: lemma = haber, VERB/AUX, dep_rel root/ccomp/xcomp/advcl
+  # f_20  Impersonal existential haber (hay, habia, hubo, ha habido, puede haber)
+  #       Condition: lemma = haber, VERB/AUX, clausal dep_rel (root/ccomp/xcomp/csubj/advcl/acl/parataxis)
   #       and NO dependent nsubj (that tells it apart from perfect haber).
-  #       The token is normalized to capture forms with and without accent.
+  #       Auxiliary haber (ha comido, haber entendido) has dep_rel aux and is
+  #       excluded by the dependency filter. Forms are compared without accents.
   # -----------------------------------------------------------------------
   existential_forms <- c(
     "hay",
-    "habia", "hab\u00eda",
+    "habia",
     "hubo",
-    "habra", "habr\u00e1",
-    "habria", "habr\u00eda",
+    "habra",
+    "habria",
     "haya",                    # present subjunctive
     "hubiera", "hubiese",      # past subjunctive
-    "habiendo"                 # existential gerund
+    "habiendo",                # existential gerund
+    "habido",                  # perfect existential (ha habido)
+    "haber"                    # infinitival existential (puede haber)
   )
 
   modal_haber <- count_modal_periphrasis(tokens, "haber", "f_53_modal_necessity")
@@ -251,14 +254,11 @@ block_passive_voice_es <- function(tokens, doc_ids, head_lookup,
     dplyr::filter(
       .data$lemma == "haber",
       .data$pos %in% c("VERB", "AUX"),
-      stringr::str_to_lower(
-        stringr::str_replace_all(.data$token, "[\u00e0-\u00fc]",
-          function(x) iconv(x, to = "ASCII//TRANSLIT"))
-      ) %in% existential_forms |
-        .data$token %in% existential_forms,
+      stringi::stri_trans_general(stringr::str_to_lower(.data$token), "Latin-ASCII") %in%
+        existential_forms,
       stringr::str_detect(
         dplyr::coalesce(.data$dep_rel, ""),
-        "^(root|ccomp|xcomp|advcl|acl|parataxis)"
+        "^(root|ccomp|xcomp|csubj|advcl|acl|parataxis)"
       )
     ) %>%
     dplyr::anti_join(

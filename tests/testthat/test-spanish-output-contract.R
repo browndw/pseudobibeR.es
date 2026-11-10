@@ -1,6 +1,6 @@
-# Regression: output contract of biber() for Spanish.
+# Regression: output contract of biber_fixture() for Spanish.
 #
-# v0.024+: surface parity with pseudobibeR.fr — biber() exposes the
+# v0.024+: surface parity with pseudobibeR.fr — biber_fixture() exposes the
 # 67 feature names of Biber (1988). f_28 is the compatibility-zero column.
 # The remaining 66 include resumptive relatives and 2 metrics.
 # Historical bug blocked: f_69/f_70/f_71 (internal extensions) must not
@@ -22,7 +22,7 @@ test_that("biber expone los 67 nombres de rasgo (paridad superficial FR)", {
     )
   ) |> as.data.frame()
 
-  res <- biber(parsed, measure = "MATTR", normalize = TRUE)
+  res <- biber_fixture(parsed, measure = "MATTR", normalize = TRUE)
   feat_cols <- grep("^f_", names(res), value = TRUE)
 
   # Complete surface inventory: 67 features
@@ -48,8 +48,8 @@ test_that("f_43/f_44 no se doblan al normalizar; conteos en rango sano", {
     x = "La producción de conocimiento requiere una evaluación rigurosa y detallada."
   ) |> as.data.frame()
 
-  rF <- biber(parsed, normalize = FALSE)
-  rT <- biber(parsed, normalize = TRUE)
+  rF <- biber_fixture(parsed, normalize = FALSE)
+  rT <- biber_fixture(parsed, normalize = TRUE)
 
   # Derived metrics identical with and without normalization
   expect_equal(rF$f_43_type_token,       rT$f_43_type_token,       tolerance = 1e-6)

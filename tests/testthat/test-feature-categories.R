@@ -1,7 +1,7 @@
 # Tests of the internal .feature_categories lookup.
 #
 # Ensures that the feature->category mapping defined in R/feature_categories.R
-# stays complete and consistent with the real output of biber().
+# stays complete and consistent with the real output of biber_fixture().
 # Any new feature added to the output that forgets its entry in
 # .feature_categories breaks this test.
 
@@ -26,7 +26,7 @@ test_that(".feature_categories tiene exactamente 16 categorias (A-P)", {
   expect_true(all(grepl("^[A-P]\\. ", uniq)))
 })
 
-test_that(".feature_categories cubre cada columna f_NN_ del output de biber()", {
+test_that(".feature_categories cubre cada columna f_NN_ del output de biber_fixture()", {
   skip_if_not_installed("udpipe")
   ud_model <- .fc_ud()
   parsed   <- udpipe::udpipe_annotate(ud_model, x = "El gato come pescado.", doc_id = "d1")
@@ -37,9 +37,9 @@ test_that(".feature_categories cubre cada columna f_NN_ del output de biber()", 
   extra     <- setdiff(names(cats), feat_cols)
 
   expect_equal(missing, character(0),
-               info = "rasgos en biber() sin categoria asignada")
+               info = "rasgos en biber_fixture() sin categoria asignada")
   expect_equal(extra,   character(0),
-               info = "categorias asignadas a rasgos que no existen en biber()")
+               info = "categorias asignadas a rasgos que no existen en biber_fixture()")
 })
 
 test_that(".zero_output_features tiene el 1 esperado y esta en .feature_categories", {

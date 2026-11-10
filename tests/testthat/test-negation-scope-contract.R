@@ -23,13 +23,13 @@ negation_scope_texts <- function() {
 }
 
 expect_negation_scope <- function(tokens) {
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expected <- c(rep(1, 9), rep(0, 4), rep(1, 3), 0, 1, 1)
   expect_equal(raw$doc_id, names(negation_scope_texts()))
   expect_equal(raw$f_67_neg_analytic, expected)
   expect_equal(raw$f_16_other_nouns[raw$doc_id == "noun"], 2)
   expect_equal(raw$f_66_neg_synthetic[raw$doc_id == "parenthetical"], 1)
-  audit <- audit_features(tokens, feature = "f_67_neg_analytic")
+  audit <- audit_fixture(tokens, feature = "f_67_neg_analytic")
   expect_true(all(tolower(audit$keyword) == "no"))
   expect_equal(tabulate(match(audit$doc_id, raw$doc_id), nbins = nrow(raw)), expected)
 }
@@ -48,19 +48,19 @@ test_that("analytic no can scope over nominal and function-word heads in both sc
   spacy$dep_rel[spacy$lemma == "no"] <- "neg"
   class(spacy) <- c("spacyr_parsed", "data.frame")
   for (input in list(tokens, spacy)) {
-    raw <- biber(input, measure = "none", normalize = FALSE)
+    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
     expect_equal(raw$f_67_neg_analytic, rep(1, length(heads)))
     expect_equal(raw$f_66_neg_synthetic, rep(0, length(heads)))
     expect_equal(raw$f_16_other_nouns[1:2], c(1, 1))
-    expect_equal(raw$n_tokens, rep(2, length(heads)))
-    expect_equal(biber(input, measure = "none")$f_67_neg_analytic,
+    expect_equal(word_tokens(input), rep(2, length(heads)))
+    expect_equal(biber_fixture(input, measure = "none")$f_67_neg_analytic,
                  rep(500, length(heads)))
-    expect_equal(audit_features(input, feature = "f_67_neg_analytic")$keyword,
+    expect_equal(audit_fixture(input, feature = "f_67_neg_analytic")$keyword,
                  rep("No", length(heads)))
   }
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_42_adverbs[1:2],
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_42_adverbs[1:2],
                c(1, 1))
-  expect_equal(biber(spacy, measure = "none", normalize = FALSE)$f_42_adverbs[1:2],
+  expect_equal(biber_fixture(spacy, measure = "none", normalize = FALSE)$f_42_adverbs[1:2],
                c(0, 0))
 })
 
@@ -87,12 +87,12 @@ test_that("no obstante and identifiable nominal no are not analytic negators", {
     c("root", "punct", "advmod", "punct")
   )
   tokens <- rbind(connector, nominal_pp, nominal_adj, quoted)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_67_neg_analytic, rep(0, 4))
   expect_equal(raw$f_42_adverbs, rep(1, 4))
   expect_equal(raw$f_45_conjuncts[1], 1)
   expect_equal(raw$f_66_neg_synthetic, rep(0, 4))
-  expect_equal(nrow(audit_features(tokens, feature = "f_67_neg_analytic")), 0)
+  expect_equal(nrow(audit_fixture(tokens, feature = "f_67_neg_analytic")), 0)
 })
 
 test_that("nominalization guards do not reject adjectival or nominal no modifiers", {
@@ -107,7 +107,7 @@ test_that("nominalization guards do not reject adjectival or nominal no modifier
     c("DET", "ADV", "ADJ", "NOUN"), c(4, 3, 4, 0),
     c("det", "advmod", "amod", "root")
   )
-  raw <- biber(rbind(prefix, attributive), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(prefix, attributive), measure = "none", normalize = FALSE)
   expect_equal(raw$f_67_neg_analytic, c(1, 1))
   expect_equal(raw$f_16_other_nouns, c(0, 1))
 })
@@ -130,11 +130,11 @@ test_that("reply prefixes are excluded without discarding the following negator"
     c(7, 7, 5, 5, 7, 7, 0), c("advmod", "punct", "case", "det", "obl", "punct", "root")
   )
   tokens <- rbind(repeated, response, parenthetical)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_67_neg_analytic, c(1, 0, 1))
   expect_equal(raw$f_42_adverbs, c(3, 1, 1))
   expect_equal(raw$f_66_neg_synthetic, c(0, 0, 1))
-  audit <- audit_features(tokens, feature = "f_67_neg_analytic")
+  audit <- audit_fixture(tokens, feature = "f_67_neg_analytic")
   expect_equal(audit$doc_id, c("repeated", "parenthetical"))
   expect_equal(audit$keyword, c("no", "No"))
 })
@@ -149,7 +149,7 @@ test_that("negation context is sentence/document-local and handles token-ID gaps
   second <- scope
   second$doc_id <- "preceding"
   second$sentence_id <- 2L
-  raw <- biber(rbind(preceding, scope, second), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(preceding, scope, second), measure = "none", normalize = FALSE)
   expect_equal(raw$doc_id, c("preceding", "scope"))
   expect_equal(raw$f_67_neg_analytic, c(1, 1))
 })
@@ -172,9 +172,9 @@ test_that("analytic no requires a real nonself lexical head", {
     make_case("self", 1), make_case("punctuation", 2, "PUNCT", "."),
     make_case("symbol", 2, "SYM", "+"), make_case("reply_chain", 2, "ADV", "no")
   ))
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_67_neg_analytic, c(1, rep(0, 6)))
-  expect_equal(audit_features(tokens, feature = "f_67_neg_analytic")$doc_id, "valid")
+  expect_equal(audit_fixture(tokens, feature = "f_67_neg_analytic")$doc_id, "valid")
 })
 
 test_that("nominal no cues preserve genuine attributive negation", {
@@ -199,7 +199,7 @@ test_that("nominal no cues preserve genuine attributive negation", {
     c(0, 3, 1, 3), c("root", "det", "obj", "advmod")
   )
   tokens <- do.call(rbind, c(nominal, attributive, list(direct_article, prenominal)))
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_67_neg_analytic, c(rep(0, 5), rep(1, 5), 0, 0))
   expect_equal(raw$f_42_adverbs, rep(1, 12))
 })
@@ -219,9 +219,9 @@ test_that("quoted standalone no is distinct from a quoted negative clause", {
     c("punct", "advmod", "root", "punct")
   )
   tokens <- do.call(rbind, c(mentions, list(clause)))
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_67_neg_analytic,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_67_neg_analytic,
                c(rep(0, 5), 1))
-  expect_equal(audit_features(tokens, feature = "f_67_neg_analytic")$keyword, "No")
+  expect_equal(audit_fixture(tokens, feature = "f_67_neg_analytic")$keyword, "No")
 })
 
 test_that("connective exclusions and comma context use local word positions", {
@@ -239,9 +239,9 @@ test_that("connective exclusions and comma context use local word positions", {
   )
   reply$token_id <- c("2", "4", "9", "12")
   tokens <- rbind(no, obstante, second, reply)
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_67_neg_analytic,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_67_neg_analytic,
                c(1, 0, 1))
-  expect_equal(audit_features(tokens, feature = "f_67_neg_analytic")$keyword, c("No", "no"))
+  expect_equal(audit_fixture(tokens, feature = "f_67_neg_analytic")$keyword, c("No", "no"))
 })
 
 test_that("live Spanish spaCy recognizes the same negation scope contract", {

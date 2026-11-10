@@ -22,12 +22,12 @@ test_that("relative marker family and role define four exclusive bins", {
     dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats"),
     class = c("spacyr_parsed", "data.frame")
   ))) {
-    raw <- biber(input, measure = "none", normalize = FALSE)
+    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
     expect_equal(unname(as.matrix(raw[relative_features[1:4]])), diag(4))
     expect_equal(rowSums(raw[relative_features]), rep(1, 4))
-    expect_equal(biber(input, measure = "none")$f_31_wh_subj, c(0, 0, 1000 / 3, 0))
+    expect_equal(biber_fixture(input, measure = "none")$f_31_wh_subj, c(0, 0, 1000 / 3, 0))
     for (feature in relative_features[1:4]) {
-      expect_equal(nrow(audit_features(input, feature = feature)), 1L)
+      expect_equal(nrow(audit_fixture(input, feature = feature)), 1L)
     }
   }
   expect_identical(tokens, original)
@@ -40,7 +40,7 @@ test_that("a conflicting explicit subject repairs a relative incorrectly tagged 
     c(0, 4, 4, 1), c("root", "nsubj", "nsubj", "acl:relcl"),
     c("Number=Sing", "PronType=Rel|Number=Sing", NA, "VerbForm=Fin|Person=3|Number=Sing")
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_31_wh_subj, 0)
   expect_equal(raw$f_32_wh_obj, 1)
   evidence <- pseudobibeR.es:::biber_es_traced(tokens, measure = "none")$evidence
@@ -59,7 +59,7 @@ test_that("singular relative and antecedent agreement can resolve a plural pro-d
   plural$token[1:2] <- c("candidatos", "quienes")
   plural$lemma[1:2] <- c("candidato", "quien")
   plural$feats[1:2] <- c("Number=Plur", "PronType=Rel|Number=Plur")
-  raw <- biber(rbind(tokens, plural), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(tokens, plural), measure = "none", normalize = FALSE)
   expect_equal(raw$f_31_wh_subj, c(0, 1))
   expect_equal(raw$f_32_wh_obj, c(1, 0))
 })
@@ -77,7 +77,7 @@ test_that("coordinated subjects block disagreement and duplicate-subject repairs
   conflict$doc_id <- "coordinated_conflict"
   conflict$head_token_id[4] <- 5
   conflict$dep_rel[4] <- "nsubj"
-  raw <- biber(rbind(tokens, conflict), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(tokens, conflict), measure = "none", normalize = FALSE)
   expect_equal(raw$f_31_wh_subj, c(1, 1))
   expect_equal(raw$f_32_wh_obj, c(0, 0))
 })
@@ -92,7 +92,7 @@ test_that("roleless que needs positive subject evidence, not just absence of ano
   unknown$doc_id <- "unknown"
   unknown$token[3] <- "compro"
   unknown$lemma[3] <- "comprar"
-  raw <- biber(rbind(tokens, unknown), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(tokens, unknown), measure = "none", normalize = FALSE)
   expect_equal(raw$f_29_that_subj, c(1, 0))
   expect_equal(raw$f_30_that_obj, c(0, 0))
 })
@@ -106,7 +106,7 @@ test_that("finite appos predicates with an explicit relative pronoun recover rel
   interrogative <- tokens
   interrogative$doc_id <- "interrogative"
   interrogative$feats[2] <- "PronType=Int"
-  raw <- biber(rbind(tokens, interrogative), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(tokens, interrogative), measure = "none", normalize = FALSE)
   expect_equal(raw$f_32_wh_obj, c(1, 0))
 })
 
@@ -173,7 +173,7 @@ expect_relative_partition_baseline <- function(tokens) {
   rows <- traced$evidence[traced$evidence$feature %in% relative_features, ]
   expect_equal(anyDuplicated(rows[c("doc_id", "sentence_id", "token_id")]), 0L)
   for (feature in relative_features) {
-    audit <- audit_features(tokens, feature = feature)
+    audit <- audit_fixture(tokens, feature = feature)
     expect_equal(tabulate(match(audit$doc_id, traced$counts$doc_id), nbins = 9),
                  expected[, match(feature, relative_features)])
   }
@@ -218,6 +218,6 @@ test_that("shipped wh-relative examples distinguish nominal relatives from quest
     tokens <- udpipe::udpipe_annotate(
       .fc_ud(), x = subset$example, doc_id = paste0("example_", seq_len(nrow(subset)))
     )
-    expect_equal(biber(tokens, measure = "none", normalize = FALSE)[[feature]], subset$count)
+    expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)[[feature]], subset$count)
   }
 })

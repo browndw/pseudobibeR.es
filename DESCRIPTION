@@ -1,11 +1,18 @@
 Package: pseudobibeR.es
 Title: Aggregate Counts of Spanish Linguistic Features
-Version: 0.1.0
+Version: 0.90
 Authors@R: 
-    person(given = "Maximiliano",
-           family = "Cordovez",
-           email = "maximiliano.cf@outlook.es",
-           role = c("aut", "cre"))
+    c(
+      person(given = "David",
+             family = "Brown",
+             role = c("aut", "cre"),
+             email = "dwb2@andrew.cmu.edu",
+             comment = c(ORCID = "0000-0001-7745-6354")),
+      person(given = "Maximiliano",
+             family = "Cordovez",
+             email = "maximiliano.cf@outlook.es",
+             role = c("aut"))
+    )
 Description: Calculates lexicogrammatical and functional features for
     Spanish texts following the framework introduced by Biber (1985)
     <doi:10.1515/ling.1985.23.2.337>. Provides a companion implementation

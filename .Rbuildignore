@@ -10,18 +10,6 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^validation$
-^TABLA_RASGOS_ES\.md$
-^CROSS_LANGUAGE_ALIGNMENT\.md$
-^CLAUDE\.md$
-^AGENTS\.md$
-^spanish-gsd-ud-2\.5-191206\.udpipe$
-^app\.R$
-^\.claude$
-^analizador$
-^El marcador$
-^pseudobibeR\.fr$
-^START_HERE_EMPEZAR_AQUI\.md$
-^VERSION_COPIA\.txt$
 ^tests/models$
 ^tests/testthat/fixtures/.*\.udpipe$
 ^LICENSE\.md$

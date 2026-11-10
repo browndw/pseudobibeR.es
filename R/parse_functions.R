@@ -36,7 +36,7 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
       tokens, doc_ids,
       dictionary_to_lemmas(dict, "f_04_place_adverbials"),
       dictionary_to_lemmas(dict, "f_05_time_adverbials"),
-      dictionary_to_lemmas(dict, "f_11_indefinite_pronoun")
+      dictionary_to_lemmas(dict, "f_11_indefinite_pronouns")
     ),
     block_personal_pronouns_es(tokens, doc_ids),
     block_proverbs_es(tokens, doc_ids, get_word_list(word_lists, "proverb_object_pronouns")),
@@ -61,7 +61,7 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
       get_word_list(word_lists, "resumptive_prepositional_frames"),
       get_word_list(word_lists, "resumptive_first_person_forms")
     ),
-    block_adj_prep_adv_es(tokens, doc_ids, dict, word_lists, neg_adverbs),
+    block_adj_prep_adv_es(tokens, doc_ids, dict, word_lists),
     block_specialized_verbs_es(tokens, doc_ids, dict),
     block_modals_es(tokens, doc_ids, dict),
     block_contractions_es(tokens, doc_ids, get_word_list(word_lists, "colloquial_contractions")),
@@ -79,13 +79,11 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
     block_negation_es(
       tokens, doc_ids,
       normalize_terms(get_word_list(word_lists, "neg_synthetic_determiners")),
-      neg_terms, neg_adverbs,
+      neg_terms,
       nominal_no_modifiers = get_word_list(word_lists, "neg_nominal_no_modifiers")
     )
   )
   evidence <- do.call(bind_evidence, lapply(blocks, extract_evidence))
-  evidence$feature[evidence$feature == "f_11_indefinite_pronoun"] <-
-    "f_11_indefinite_pronouns"
   evidence <- evidence[evidence$feature %in% .evidence_features, ]
 
   lexical <- dictionary_evidence(tokens, c(.dual_path_features, .dict_only_features))
@@ -147,8 +145,7 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
       ]
     }
   }
-  counts <- counts[, c("doc_id", intersect(names(.feature_categories), names(counts)),
-                       "n_tokens", "n_lex_tokens")]
+  counts <- counts[, c("doc_id", intersect(names(.feature_categories), names(counts)))]
   counts <- as.data.frame(counts, stringsAsFactors = FALSE)
   if (traced) list(counts = counts, evidence = evidence) else counts
 }

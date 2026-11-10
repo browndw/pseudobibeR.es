@@ -32,13 +32,13 @@ test_that("bounded resumptive PP relatives count once and leave the gap-relative
     dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats"),
     class = c("spacyr_parsed", "data.frame")
   ))) {
-    raw <- biber(input, measure = "none", normalize = FALSE)
+    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
     expect_equal(raw$f_61_stranded_preposition, rep(1, 4))
     expect_equal(rowSums(raw[c("f_29_that_subj", "f_30_that_obj", "f_31_wh_subj",
                               "f_32_wh_obj", "f_33_pied_piping", "f_34_sentence_relatives")]),
                  rep(0, 4))
-    expect_equal(biber(input, measure = "none")$f_61_stranded_preposition, rep(200, 4))
-    audit <- audit_features(input, feature = "f_61_stranded_preposition", window = 0)
+    expect_equal(biber_fixture(input, measure = "none")$f_61_stranded_preposition, rep(200, 4))
+    audit <- audit_fixture(input, feature = "f_61_stranded_preposition", window = 0)
     expect_equal(audit$keyword, c("de \u00e9l", "de \u00e9l", "en ella", "de \u00e9l"))
     expect_equal(lengths(strsplit(audit$keyword, " ", fixed = TRUE)), rep(2L, 4))
   }
@@ -67,7 +67,7 @@ test_that("ordinary subject/object relatives and unrelated PP pronouns are not r
   pronoun$token[5] <- pronoun$lemma[5] <- "m\u00ed"
   pronoun$feats[5] <- "PronType=Prs|Person=1"
   tokens <- rbind(subject, object, language, gender, number, pronoun)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_61_stranded_preposition, rep(0, 6))
   expect_equal(raw$f_29_that_subj[1], 1)
   expect_equal(raw$f_30_that_obj[2:3], c(1, 1))
@@ -91,7 +91,7 @@ test_that("a finite external subject and a projected finite auxiliary license re
   compound$dep_rel[3] <- "aux"
   compound$feats[3:4] <- c("VerbForm=Fin|Person=1|Number=Sing", "VerbForm=Part")
   tokens <- rbind(external, compound)
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition,
                c(1, 1))
 })
 
@@ -104,7 +104,7 @@ test_that("pied-piping remains exclusive and unchanged even with a later pronoun
     c("Gender=Masc|Number=Sing", NA, "PronType=Rel", "VerbForm=Fin|Person=1",
       NA, "PronType=Prs|Person=3|Gender=Masc|Number=Sing")
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_33_pied_piping, 1)
   expect_equal(raw$f_61_stranded_preposition, 0)
 })
@@ -130,7 +130,7 @@ test_that("overt direct objects, coordinated relative subjects and non-relative 
   fronted <- resumptive_clause("fronted_pp")
   fronted$token_id <- c("1", "2", "5", "3", "4")
   tokens <- rbind(object, coordinated, non_relative, fronted)
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition,
                rep(0, 4))
 })
 
@@ -140,7 +140,7 @@ test_that("lookup-only first-person recovery does not rewrite source annotations
   tokens$upos[3] <- tokens$xpos[3] <- "NOUN"
   tokens$feats[3] <- "Gender=Masc|Number=Sing"
   original <- tokens
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition, 1)
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition, 1)
   expect_identical(tokens, original)
 })
 
@@ -155,17 +155,17 @@ test_that("resumption counts constructions, not repeated pronouns, and respects 
       "PronType=Prs|Person=3|Gender=Masc|Number=Sing", NA, NA,
       "PronType=Prs|Person=3|Gender=Masc|Number=Sing")
   )
-  expect_equal(biber(repeated, measure = "none", normalize = FALSE)$f_61_stranded_preposition, 1)
-  expect_equal(nrow(audit_features(repeated, feature = "f_61_stranded_preposition")), 1L)
+  expect_equal(biber_fixture(repeated, measure = "none", normalize = FALSE)$f_61_stranded_preposition, 1)
+  expect_equal(nrow(audit_fixture(repeated, feature = "f_61_stranded_preposition")), 1L)
   tokens <- resumptive_clause("ids")
   tokens$token_id <- c("10", "20", "40", "60", "80")
   tokens$head_token_id <- c("0", "40", "10", "80", "40")
-  expect_equal(audit_features(tokens, feature = "f_61_stranded_preposition")$keyword, "de \u00e9l")
+  expect_equal(audit_fixture(tokens, feature = "f_61_stranded_preposition")$keyword, "de \u00e9l")
   tokens$sentence_id[4:5] <- 2L
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition, 0)
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition, 0)
   tokens$sentence_id <- 1L
   tokens$doc_id[4:5] <- "other"
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition,
                c(0, 0))
 })
 
@@ -202,15 +202,15 @@ expect_resumptive_relative_baseline <- function(tokens) {
   expect_equal(traced$counts$f_61_stranded_preposition, expected)
   evidence <- traced$evidence[traced$evidence$feature == "f_61_stranded_preposition", ]
   expect_equal(anyDuplicated(evidence[c("doc_id", "sentence_id", "token_id")]), 0L)
-  audit <- audit_features(tokens, feature = "f_61_stranded_preposition", window = 0)
+  audit <- audit_fixture(tokens, feature = "f_61_stranded_preposition", window = 0)
   expect_equal(tabulate(match(audit$doc_id, traced$counts$doc_id), nbins = 20), expected)
   expect_equal(audit$keyword, evidence$token)
   bins <- c("f_29_that_subj", "f_30_that_obj", "f_31_wh_subj", "f_32_wh_obj",
             "f_33_pied_piping", "f_34_sentence_relatives")
   expect_equal(unname(rowSums(traced$counts[expected == 1, bins])), rep(0, sum(expected)))
   expect_equal(traced$counts$f_33_pied_piping[12:13], c(1, 1))
-  expect_equal(biber(tokens, measure = "TTR")$f_61_stranded_preposition,
-               1000 * expected / traced$counts$n_tokens)
+  expect_equal(biber_fixture(tokens, measure = "TTR")$f_61_stranded_preposition,
+               1000 * expected / word_tokens(tokens))
   expect_identical(tokens, original)
 }
 
@@ -250,6 +250,6 @@ test_that("shipped f61 examples distinguish resumption, ordinary relatives and p
   tokens <- udpipe::udpipe_annotate(
     .fc_ud(), x = examples$example, doc_id = paste0("example_", seq_len(nrow(examples)))
   )
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition,
                examples$count)
 })

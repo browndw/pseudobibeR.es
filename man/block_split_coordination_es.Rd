@@ -31,6 +31,7 @@ Data frame with f_63, f_64, f_65
 }
 \description{
 f_63  Auxiliar escindido: ADV interviene entre auxiliar y verbo principal
+(no solo, el negador analitico, no cuenta; D-49)
 f_64  Coordinacion sintagmatica: CCONJ entre sintagmas no clausales
 f_65  Coordinacion clausal:      CCONJ entre clausulas con sujeto
 }

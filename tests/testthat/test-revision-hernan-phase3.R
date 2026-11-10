@@ -7,9 +7,11 @@
 
 feat_p3 <- function(text, feature) as.numeric(run_biber(text)[[feature]])
 
-test_that("f_15 distinguishes noun-like infinitives from ordinary infinitival clauses", {
+test_that("f_15 distinguishes nominal infinitives from ordinary infinitival clauses", {
   skip_if_not_installed("udpipe")
-  expect_equal(feat_p3("Fumar perjudica la salud.", "f_15_gerunds"), 0)
+  # A preverbal subject infinitive is nominal (Smoking harms health).
+  expect_equal(feat_p3("Fumar perjudica la salud.", "f_15_gerunds"), 1)
+  expect_equal(feat_p3("Es importante descansar.", "f_15_gerunds"), 0)
   expect_equal(feat_p3("Me gusta nadar en el mar.", "f_15_gerunds"), 0)
   expect_equal(feat_p3("El fumar constante daña la salud.", "f_15_gerunds"), 1)
 })

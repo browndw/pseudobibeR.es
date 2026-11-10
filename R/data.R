@@ -29,3 +29,15 @@
 #' directly to [biber()] and [audit_features()].
 #' @format A `udpipe_connlu` annotation object for three Spanish documents.
 "udpipe_samples"
+
+#' Display names for feature columns
+#'
+#' A named character vector mapping shared feature identifiers (names) to the
+#' Spanish display names used in [biber()] and [audit_features()] output, e.g.
+#' `f_15_gerunds` to `f_15_nominal_infinitives`. Each display name keeps its
+#' `f_NN_` number, which identifies the same feature in the English, Spanish
+#' and French packages. Features not listed keep their shared name. Built from
+#' `data-raw/feature_names.yaml`.
+#' @format A named character vector.
+#' @seealso [biber()]
+"feature_names"

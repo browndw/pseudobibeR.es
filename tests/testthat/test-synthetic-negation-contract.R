@@ -20,13 +20,13 @@ synthetic_negation_texts <- function() {
 }
 
 expect_synthetic_negation_contract <- function(tokens) {
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expected66 <- c(rep(1, 11), 2, 1, 0, 0, 0)
   expected67 <- c(0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0)
   expect_equal(raw$doc_id, names(synthetic_negation_texts()))
   expect_equal(raw$f_66_neg_synthetic, expected66)
   expect_equal(raw$f_67_neg_analytic, expected67)
-  audit <- audit_features(tokens, feature = "f_66_neg_synthetic")
+  audit <- audit_fixture(tokens, feature = "f_66_neg_synthetic")
   expect_equal(tabulate(match(audit$doc_id, raw$doc_id), nbins = nrow(raw)), expected66)
   expect_true(all(tolower(audit$keyword) %in%
                     c("ning\u00fan", "nadie", "nada", "nunca", "jam\u00e1s", "tampoco", "ni")))
@@ -44,13 +44,13 @@ test_that("synthetic lexical negatives retain per-word concord counts in both sc
   spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
   class(spacy) <- c("spacyr_parsed", "data.frame")
   for (input in list(tokens, spacy)) {
-    raw <- biber(input, measure = "none", normalize = FALSE)
+    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
     expect_equal(raw$f_66_neg_synthetic, rep(1, length(forms)))
     expect_equal(raw$f_67_neg_analytic, rep(1, length(forms)))
-    expect_equal(raw$n_tokens, rep(3, length(forms)))
-    expect_equal(biber(input, measure = "none")$f_66_neg_synthetic,
+    expect_equal(word_tokens(input), rep(3, length(forms)))
+    expect_equal(biber_fixture(input, measure = "none")$f_66_neg_synthetic,
                  rep(1000 / 3, length(forms)), tolerance = 0.001)
-    expect_equal(audit_features(input, feature = "f_66_neg_synthetic")$keyword, forms)
+    expect_equal(audit_fixture(input, feature = "f_66_neg_synthetic")$keyword, forms)
   }
 })
 
@@ -67,10 +67,10 @@ test_that("ordinary nominal uses are excluded without discarding negative determ
     "genuine", c("La", "ninguna", "importancia"), c("el", "ninguno", "importancia"),
     c("DET", "DET", "NOUN"), c(3, 3, 0), c("det", "det", "root")
   )
-  raw <- biber(rbind(nominal_nada, nominal_nadie, genuine),
+  raw <- biber_fixture(rbind(nominal_nada, nominal_nadie, genuine),
                measure = "none", normalize = FALSE)
   expect_equal(raw$f_66_neg_synthetic, c(0, 0, 1))
-  expect_equal(audit_features(rbind(nominal_nada, nominal_nadie, genuine),
+  expect_equal(audit_fixture(rbind(nominal_nada, nominal_nadie, genuine),
                              feature = "f_66_neg_synthetic")$keyword, "ninguna")
 })
 
@@ -87,14 +87,14 @@ test_that("Nadie recovery is restricted to the demonstrated verbal subject patte
     make_case("missing", "Nadie", "nsubj", 9),
     make_case("nonpredicate", "Nadie", "nsubj", head_pos = "NOUN")
   ))
-  raw <- biber(tokens, measure = "TTR", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "TTR", normalize = FALSE)
   expect_equal(raw$f_66_neg_synthetic, c(1, 1, 0, 0, 0, 0))
   control <- tokens
   control$lemma[control$lemma == "nadie"] <- "nombre"
-  control_raw <- biber(control, measure = "none", normalize = FALSE)
+  control_raw <- biber_fixture(control, measure = "none", normalize = FALSE)
   keep <- setdiff(names(control_raw), "f_66_neg_synthetic")
   expect_equal(raw[keep], control_raw[keep])
-  audit <- audit_features(tokens, feature = "f_66_neg_synthetic")
+  audit <- audit_fixture(tokens, feature = "f_66_neg_synthetic")
   expect_equal(audit$keyword, c("Nadie", "Nadie"))
   expect_true(all(tokens$upos[tokens$lemma == "nadie"] == "PROPN"))
 })
@@ -105,10 +105,10 @@ test_that("recovered and ordinary lexical markers retain input occurrence order"
                     c("PROPN", "VERB", "PRON"), c(2, 0, 2), c("nsubj", "root", "obj"))
   }
   tokens <- rbind(make_case("z"), make_case("a"))
-  audit <- audit_features(tokens, feature = "f_66_neg_synthetic")
+  audit <- audit_fixture(tokens, feature = "f_66_neg_synthetic")
   expect_equal(audit$doc_id, c("z", "z", "a", "a"))
   expect_equal(audit$keyword, c("Nadie", "nada", "Nadie", "nada"))
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_66_neg_synthetic, c(2, 2))
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_66_neg_synthetic, c(2, 2))
 })
 
 test_that("nominal-use guards are sentence-local, direction-sensitive and gap-safe", {
@@ -123,7 +123,7 @@ test_that("nominal-use guards are sentence-local, direction-sensitive and gap-sa
     "after", c("Nadie", "vino", "la"), c("nadie", "venir", "el"),
     c("PROPN", "VERB", "DET"), c(2, 0, 1), c("nsubj", "root", "det")
   )
-  expect_equal(biber(rbind(article, subject, second, after),
+  expect_equal(biber_fixture(rbind(article, subject, second, after),
                      measure = "none", normalize = FALSE)$f_66_neg_synthetic, c(1, 1, 1))
 })
 
@@ -134,7 +134,7 @@ test_that("idiom disambiguation and new negative classes remain outside this pas
   tokens <- as.data.frame(udpipe::udpipe_annotate(
     .fc_ud(), x = texts, doc_id = paste0("deferred_", seq_along(texts))
   ))
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_66_neg_synthetic,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_66_neg_synthetic,
                c(1, 1, 1, 1, 0))
 })
 

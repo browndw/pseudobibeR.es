@@ -13,7 +13,7 @@ resource_isolation_case <- function() {
   )
   spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
   class(spacy) <- c("spacyr_parsed", "data.frame")
-  inputs <- list(udpipe = tokens, spacy = spacy)
+  inputs <- list(udpipe = as_udpipe_annotation(tokens), spacy = spacy)
   features <- c("f_56_verb_private", "f_45_conjuncts", "f_39_prepositions")
   expected <- lapply(inputs, function(input) {
     list(

@@ -18,7 +18,7 @@ fc_cases <- list(
   list("f_12_proverb_do",          "Luis también lo hizo.",                        1, "Hizo una mesa. Lo hizo llorar.",              0),
   list("f_13_wh_question",         "¿Qué quieres? ¿Dónde estás ahora?",             1, "La casa que compré es grande.",               0),
   list("f_14_nominalizations",     "La producción y la evaluación del conocimiento.",1,"El lado del grado del partido.",              0),
-  list("f_15_gerunds",             "El saber es valioso.",                          1, "Fumar perjudica la salud. Quiere estudiar.",   0),
+  list("f_15_gerunds",             "El saber es valioso.",                          1, "Es importante descansar. Quiere estudiar.",    0),
   list("f_16_other_nouns",         "El perro corre en el parque con la pelota.",    2, NA,                                            NA),
   list("f_17_agentless_passives",  "Se publicaron los resultados. La tarea fue realizada.",1,"Juan comió la manzana roja.",          0),
   list("f_18_by_passives",         "El libro fue escrito por María González.",      1, "La tarea fue realizada rápido.",              0),
@@ -153,7 +153,7 @@ test_that("f_47 — quizás detectado en locale C (regression-guard UTF-8)", {
   # Documented root cause: in the "C" locale, quanteda::tokens drops
   # Encoding="UTF-8" and the accents are left as raw bytes
   # ("quizás" -> "quiz<c3><a1>s"), breaking the match against the dict.
-  # Fix: force LC_CTYPE=UTF-8 inside biber() with on.exit.
+  # Fix: force LC_CTYPE=UTF-8 inside biber_fixture() with on.exit.
   r <- run_biber("Quizás el resultado depende de otros factores.")
   expect_gte(as.numeric(r$f_47_hedges), 1)
 })
@@ -173,11 +173,11 @@ test_that("f_24 exposes the known root misparse rather than suppressing roots", 
   quiero <- tolower(parsed$token) == "quiero"
   expect_equal(sum(quiero), 1)
   expect_true(grepl("VerbForm=Inf", parsed$feats[quiero]))
-  expect_equal(biber(parsed, measure = "none", normalize = FALSE)$f_24_infinitives, 4)
+  expect_equal(biber_fixture(parsed, measure = "none", normalize = FALSE)$f_24_infinitives, 4)
 
   parsed$feats[quiero] <- "Mood=Ind|Person=1|Number=Sing|Tense=Pres|VerbForm=Fin"
-  expect_equal(biber(parsed, measure = "none", normalize = FALSE)$f_24_infinitives, 3)
-  expect_setequal(audit_features(parsed, feature = "f_24_infinitives")$keyword,
+  expect_equal(biber_fixture(parsed, measure = "none", normalize = FALSE)$f_24_infinitives, 3)
+  expect_setequal(audit_fixture(parsed, feature = "f_24_infinitives")$keyword,
                   c("terminar", "poder", "descansar"))
 })
 
@@ -226,16 +226,20 @@ for (zcol in .zero_output_cols) {
   })
 }
 
-# ── Regression §3.J f_44 (official worked example of the spec) ────────────
-# Spec: mean of nchar() over ALL tokens except punctuation, with no
-# lexical filter and no threshold. Historical bug: it filtered to NOUN/VERB/ADJ/ADV
-# and returned ~8.75 on the worked example (it should be 5.22). See
-# audit/CONTRACT_CHECK.md §3 + §5.1.
+# ── Regression §3.J f_44 (worked example) ─────────────────────────────────
+# D-51: mean of nchar() over purely alphabetic word tokens, with no POS filter
+# and no rounding. Historical bug: it filtered to NOUN/VERB/ADJ/ADV and
+# returned ~8.75 on the worked example (it should be 5.22).
 
-test_that("f_44 uses all non-PUNCT tokens per spec §3.J", {
+test_that("f_44 uses all alphabetic word tokens regardless of POS (D-51)", {
   r <- run_biber("El informe fue redactado por el equipo de investigación.")
   expect_equal(round(as.numeric(r$f_44_mean_word_length), 2), 5.22,
-               info = "Spec: 47 chars / 9 tokens no-PUNCT = 5.22")
+               info = "47 letters / 9 alphabetic tokens = 5.22")
+})
+
+test_that("f_44 excludes numerals and is not rounded (D-51)", {
+  r <- run_biber("En 2024 compré 35 libros.")
+  expect_equal(as.numeric(r$f_44_mean_word_length), 14 / 3)
 })
 
 test_that("f_44 is invariant under normalize=TRUE (ratio, not count)", {

@@ -10,12 +10,12 @@ test_that("f_42 excludes exactly the five specified specialized adverb groups", 
   spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
   class(spacy) <- c("spacyr_parsed", "data.frame")
   for (input in list(tokens, spacy)) {
-    raw <- biber(input, measure = "none", normalize = FALSE)
+    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
     expect_equal(unlist(raw[1, excluded], use.names = FALSE), rep(1, 5))
     expect_equal(raw$f_42_adverbs, 1)
-    expect_equal(raw$n_tokens, 6)
-    expect_equal(biber(input, measure = "none")$f_42_adverbs, 1000 / 6)
-    audit <- audit_features(input, feature = "f_42_adverbs")
+    expect_equal(word_tokens(input), 6)
+    expect_equal(biber_fixture(input, measure = "none")$f_42_adverbs, 1000 / 6)
+    audit <- audit_fixture(input, feature = "f_42_adverbs")
     expect_equal(audit$keyword, "r\u00e1pidamente")
     expect_equal(sum(audit$count), raw$f_42_adverbs)
   }
@@ -27,11 +27,11 @@ test_that("phrase exclusions cover adverbs beyond non-adverb anchors and token g
     c("DET", "ADV", "ADV"), c(3, 0, 0), c("det", "root", "root")
   )
   tokens$token_id <- c("1", "3", "7")
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_46_downtoners, 1)
   expect_equal(raw$f_42_adverbs, 1)
-  expect_equal(audit_features(tokens, feature = "f_46_downtoners")$keyword, "Un poco")
-  audit <- audit_features(tokens, feature = "f_42_adverbs")
+  expect_equal(audit_fixture(tokens, feature = "f_46_downtoners")$keyword, "Un poco")
+  audit <- audit_fixture(tokens, feature = "f_42_adverbs")
   expect_equal(audit$keyword, "r\u00e1pidamente")
   expect_equal(sum(audit$count), raw$f_42_adverbs)
 })
@@ -46,15 +46,15 @@ test_that("multi-adverb and overlapping phrases use covered occurrences, not sub
     c("en", "cierto", "medida", "r\u00e1pidamente"),
     c("ADP", "ADJ", "NOUN", "ADV"), rep(0, 4), rep("root", 4)
   )
-  raw <- biber(rbind(multiple, no_adverbs), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(multiple, no_adverbs), measure = "none", normalize = FALSE)
   expect_equal(raw$f_46_downtoners, c(1, 1))
   expect_equal(raw$f_47_hedges, c(1, 1))
   expect_equal(raw$f_42_adverbs, c(0, 1))
-  audit <- audit_features(rbind(multiple, no_adverbs), feature = "f_42_adverbs")
+  audit <- audit_fixture(rbind(multiple, no_adverbs), feature = "f_42_adverbs")
   expect_equal(audit$doc_id, "no_adverbs")
   expect_equal(audit$keyword, "r\u00e1pidamente")
-  expect_equal(biber(multiple, measure = "none")$f_42_adverbs, 0)
-  expect_equal(nrow(audit_features(multiple, feature = "f_42_adverbs")), 0L)
+  expect_equal(biber_fixture(multiple, measure = "none")$f_42_adverbs, 0)
+  expect_equal(nrow(audit_fixture(multiple, feature = "f_42_adverbs")), 0L)
 })
 
 test_that("lemma-only adverbial detections exclude their actual token keys", {
@@ -63,13 +63,13 @@ test_that("lemma-only adverbial detections exclude their actual token keys", {
     c("aqu\u00ed", "hoy", "r\u00e1pidamente"), rep("ADV", 3),
     rep(0, 3), rep("root", 3)
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_04_place_adverbials, 1)
   expect_equal(raw$f_05_time_adverbials, 1)
   expect_equal(raw$f_42_adverbs, 1)
-  expect_equal(audit_features(tokens, feature = "f_04_place_adverbials")$keyword,
+  expect_equal(audit_fixture(tokens, feature = "f_04_place_adverbials")$keyword,
                "variante_lugar")
-  expect_equal(audit_features(tokens, feature = "f_42_adverbs")$keyword,
+  expect_equal(audit_fixture(tokens, feature = "f_42_adverbs")$keyword,
                "r\u00e1pidamente")
 })
 
@@ -86,12 +86,12 @@ test_that("exclusions stay within document and sentence boundaries", {
   other$doc_id <- "b"
   other$sentence_id <- 1L
   tokens <- rbind(phrase, separate, other)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$doc_id, c("a", "b"))
   expect_equal(raw$f_42_adverbs, c(2, 2))
   expect_equal(raw$f_46_downtoners, c(1, 0))
   expect_equal(raw$f_47_hedges, c(1, 0))
-  audit <- audit_features(tokens, feature = "f_42_adverbs")
+  audit <- audit_fixture(tokens, feature = "f_42_adverbs")
   expect_equal(audit$sentence_id[audit$doc_id == "a"], c(2L, 2L))
   expect_equal(audit$sentence_id[audit$doc_id == "b"], c(1L, 1L))
 })
@@ -104,12 +104,12 @@ test_that("emphatic, conjunct, discourse, and negative adverbs are not extra exc
     c("ADV", "ADV", "ADV", "ADV", "VERB", "VERB", "INTJ"),
     c(5, 5, 5, 5, 0, 0, 0), c(rep("advmod", 4), rep("root", 3))
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_49_emphatics, 1)
   expect_equal(raw$f_45_conjuncts, 1)
   expect_gte(raw$f_50_discourse_particles, 2)
   expect_equal(raw$f_67_neg_analytic, 1)
   expect_equal(raw$f_42_adverbs, 4)
-  expect_equal(audit_features(tokens, feature = "f_42_adverbs")$keyword,
+  expect_equal(audit_fixture(tokens, feature = "f_42_adverbs")$keyword,
                c("claramente", "entonces", "pues", "no"))
 })

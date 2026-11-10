@@ -173,6 +173,7 @@ block_interrupted_infinitives_es <- function(tokens, doc_ids, negative_terms,
 #' Split auxiliary and coordination features (Spanish)
 #'
 #' f_63  Auxiliar escindido: ADV interviene entre auxiliar y verbo principal
+#'       (no solo, el negador analitico, no cuenta; D-49)
 #' f_64  Coordinacion sintagmatica: CCONJ entre sintagmas no clausales
 #' f_65  Coordinacion clausal:      CCONJ entre clausulas con sujeto
 #'
@@ -195,7 +196,8 @@ block_split_coordination_es <- function(tokens, doc_ids, token_lookup,
     ) %>%
     dplyr::transmute(
       .data$doc_id, .data$sentence_id,
-      adv_tok = .data$token_id_int
+      adv_tok = .data$token_id_int,
+      analytic_negator = stringr::str_to_lower(.data$lemma) %in% c("no", negation_part_lemmas)
     )
 
   aux_deps <- auxiliary_complements(tokens) %>%
@@ -210,7 +212,9 @@ block_split_coordination_es <- function(tokens, doc_ids, token_lookup,
       span_max = pmax(.data$token_id_int, .data$complement_id)
     )
 
-  # f_63  Phase 2k: keep columns for evidence.
+  # f_63 (D-49): the analytic negator no alone (puede no venir), the
+  # counterpart of English not, does not split an auxiliary; negative adverbs
+  # such as nunca do, as English never does.
   f63 <- aux_deps %>%
     dplyr::left_join(adv_interveners, by = c("doc_id", "sentence_id"),
                      relationship = "many-to-many") %>%
@@ -219,6 +223,9 @@ block_split_coordination_es <- function(tokens, doc_ids, token_lookup,
       .data$adv_tok > .data$span_min,
       .data$adv_tok < .data$span_max
     ) %>%
+    dplyr::group_by(.data$doc_id, .data$sentence_id, .data$token_id_int, .data$complement_id) %>%
+    dplyr::filter(!all(.data$analytic_negator)) %>%
+    dplyr::ungroup() %>%
     count_feature_traced("f_63_split_auxiliary")
 
   finite_verbs <- tokens %>%
@@ -554,7 +561,6 @@ analytic_negation_rows <- function(tokens, negation_terms, nominal_no_modifiers)
 #' @param neg_synthetic_terms Negative determiner, pronoun, adverb, and
 #'   coordinator lemmas (ninguno, nadie, nada, nunca, jamas, tampoco, ni).
 #' @param negation_part_lemmas Lemmas de particulas negativas (no)
-#' @param negation_adverbs Unused compatibility argument.
 #' @param nominal_no_modifiers Adjective lemmas used with an article to
 #'   identify nominalized <<no>>, such as <<un no rotundo>>.
 #' @return Block result with f_66/f_67 counts and token-level evidence.
@@ -562,7 +568,6 @@ analytic_negation_rows <- function(tokens, negation_terms, nominal_no_modifiers)
 block_negation_es <- function(tokens, doc_ids,
                                neg_synthetic_terms,
                                negation_part_lemmas,
-                               negation_adverbs = NULL,
                                nominal_no_modifiers = get_word_list(
                                  pseudobibeR.es::word_lists, "neg_nominal_no_modifiers")) {
 
@@ -787,5 +792,17 @@ nominal_infinitive_rows <- function(tokens, word_lists_lookup, dict_lookup) {
     if (!nrow(shared)) break
     nominal <- dplyr::bind_rows(nominal, shared)
   }
+  # Infinitives heading a subject clause placed before their predicate are
+  # gerund-like nominals (Fumar perjudica la salud ~ Smoking harms health),
+  # even with their own objects. Postposed subjects (Es importante descansar ~
+  # It is important to rest) stay verbal infinitives.
+  subject_infinitives <- candidates %>%
+    dplyr::filter(
+      stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), "^(nsubj|csubj)($|:)"),
+      !is.na(.data$head_token_id_int),
+      .data$token_id_int < .data$head_token_id_int
+    ) %>%
+    dplyr::select(dplyr::all_of(keys))
+  nominal <- dplyr::distinct(dplyr::bind_rows(nominal, subject_infinitives))
   dplyr::semi_join(tokens, nominal, by = keys)
 }

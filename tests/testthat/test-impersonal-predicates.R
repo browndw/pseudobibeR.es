@@ -14,11 +14,11 @@ impersonal_predicate_texts <- function() {
 }
 
 expect_impersonal_predicates <- function(tokens) {
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expected <- c(rep(1, 10), rep(0, 10))
   expect_equal(raw$doc_id, names(impersonal_predicate_texts()))
   expect_equal(raw$f_09_pronoun_it, expected)
-  audit <- audit_features(tokens, feature = "f_09_pronoun_it")
+  audit <- audit_fixture(tokens, feature = "f_09_pronoun_it")
   expect_equal(tabulate(match(audit$doc_id, raw$doc_id), nbins = nrow(raw)), expected)
   expect_equal(tolower(audit$keyword),
                c("llueve", "nieva", "lloviendo", "llover", "hace", "hace",
@@ -43,13 +43,13 @@ test_that("impersonal f_09 counts real predicate anchors rather than null pronou
   spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
   class(spacy) <- c("spacyr_parsed", "data.frame")
   for (input in list(tokens, spacy)) {
-    raw <- biber(input, measure = "TTR", normalize = FALSE)
+    raw <- biber_fixture(input, measure = "TTR", normalize = FALSE)
     expect_equal(raw$f_09_pronoun_it, c(1, 1, 1))
-    expect_equal(raw$n_tokens, c(1, 3, 3))
+    expect_equal(word_tokens(input), c(1, 3, 3))
     expect_equal(raw$f_08_third_person_pronouns, c(0, 0, 0))
-    expect_equal(biber(input, measure = "none")$f_09_pronoun_it,
+    expect_equal(biber_fixture(input, measure = "none")$f_09_pronoun_it,
                  1000 / c(1, 3, 3), tolerance = 0.001)
-    expect_equal(audit_features(input, feature = "f_09_pronoun_it")$keyword,
+    expect_equal(audit_fixture(input, feature = "f_09_pronoun_it")$keyword,
                  c("Llueve", "importante", "Parece"))
   }
 })
@@ -71,7 +71,7 @@ test_that("weather constructions do not duplicate auxiliary chains or shared com
     c(2, 0, 2, 2), c("cop", "root", "csubj", "csubj"),
     c(fin, NA, "VerbForm=Inf", "VerbForm=Inf")
   )
-  raw <- biber(rbind(chain, cold, repeated), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(chain, cold, repeated), measure = "none", normalize = FALSE)
   expect_equal(raw$f_09_pronoun_it, c(1, 1, 1))
 })
 
@@ -108,10 +108,10 @@ test_that("nominal subjects, personal pro-drop and generic complements do not co
   )
   hay <- contract_clause("hay", "Hay", "haber", "VERB", 0, "root", fin)
   tokens <- rbind(personal, generic, raising, subject, fronted, adjective, se, hay)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_09_pronoun_it, rep(0, 8))
   expect_equal(raw$f_20_existential_there[8], 1)
-  expect_equal(nrow(audit_features(tokens, feature = "f_09_pronoun_it")), 0L)
+  expect_equal(nrow(audit_fixture(tokens, feature = "f_09_pronoun_it")), 0L)
 })
 
 test_that("predicate links are sentence-local and tolerate noncontiguous word IDs", {
@@ -122,9 +122,9 @@ test_that("predicate links are sentence-local and tolerate noncontiguous word ID
     c(fin, NA, "VerbForm=Inf")
   )
   tokens$token_id <- c("1", "4", "9")
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it, 1)
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it, 1)
   tokens$sentence_id[3] <- 2L
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it, 0)
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it, 0)
 })
 
 test_that("UD empty nodes are not counted or invented as f_09 occurrences", {
@@ -132,10 +132,10 @@ test_that("UD empty nodes are not counted or invented as f_09 occurrences", {
   tokens <- contract_clause("empty", c("Llueve", "pro"), c("llover", "pro"),
                             c("VERB", "PRON"), c(0, 1), c("root", "nsubj"), c(fin, NA))
   tokens$token_id <- c("1", "1.1")
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_09_pronoun_it, 1)
-  expect_equal(raw$n_tokens, 1)
-  expect_equal(audit_features(tokens, feature = "f_09_pronoun_it")$keyword, "Llueve")
+  expect_equal(word_tokens(tokens), 1)
+  expect_equal(audit_fixture(tokens, feature = "f_09_pronoun_it")$keyword, "Llueve")
 })
 
 test_that("closed weather recovery preserves original annotations and excludes nominal roots", {
@@ -154,7 +154,7 @@ test_that("closed weather recovery preserves original annotations and excludes n
     "nominal", c("El", "Llueve"), c("el", "Llueve"), c("DET", "PROPN"),
     c(2, 0), c("det", "root")
   )
-  expect_equal(biber(nominal, measure = "none", normalize = FALSE)$f_09_pronoun_it, 0)
+  expect_equal(biber_fixture(nominal, measure = "none", normalize = FALSE)$f_09_pronoun_it, 0)
 })
 
 test_that("selected impersonal verbs require their own postposed clausal links", {
@@ -168,23 +168,23 @@ test_that("selected impersonal verbs require their own postposed clausal links",
       c(fin, NA, fin)
     )
   }))
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it,
                rep(1, 6))
   tokens$dep_rel[tokens$dep_rel == "ccomp"] <- "csubj"
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it,
                rep(1, 6))
   tokens$sentence_id[tokens$token == "que"] <- 2L
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it,
                rep(0, 6))
   tokens$sentence_id <- 1L
   tokens$doc_id[tokens$token == "que"] <-
     paste0(tokens$doc_id[tokens$token == "que"], "_unrelated")
-  expect_true(all(biber(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it == 0))
+  expect_true(all(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it == 0))
   infinitival <- contract_clause(
     "infinitival", c("Conviene", "descansar"), c("convenir", "descansar"),
     c("VERB", "VERB"), c(0, 1), c("root", "xcomp"), c(fin, "VerbForm=Inf")
   )
-  expect_equal(biber(infinitival, measure = "none", normalize = FALSE)$f_09_pronoun_it, 1)
+  expect_equal(biber_fixture(infinitival, measure = "none", normalize = FALSE)$f_09_pronoun_it, 1)
 })
 
 test_that("weather predicates respect controlling subjects and finite auxiliary agreement", {
@@ -210,7 +210,7 @@ test_that("weather predicates respect controlling subjects and finite auxiliary 
     c("root", "xcomp", "mark", "xcomp"),
     c("Number=Sing|Person=1|VerbForm=Fin", "VerbForm=Inf", NA, "VerbForm=Inf")
   )
-  raw <- biber(rbind(controlled, embedded, first_person, nested),
+  raw <- biber_fixture(rbind(controlled, embedded, first_person, nested),
                measure = "none", normalize = FALSE)
   expect_equal(raw$f_09_pronoun_it, c(0, 1, 0, 0))
 })

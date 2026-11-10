@@ -12,7 +12,9 @@ nominal_infinitive_texts <- function() {
 
 expect_nominal_infinitive_baseline <- function(tokens) {
   result <- pseudobibeR.es:::biber_es_traced(tokens, measure = "none", normalize = FALSE)
-  expected <- c(rep(1, 6), 2, rep(0, 5))
+  # verbal (El fumar cigarrillos...) and bare (Fumar perjudica...) are preverbal
+  # subject infinitives; extraposed descansar stays a verbal infinitive.
+  expected <- c(rep(1, 6), 2, 1, 1, rep(0, 3))
   expect_equal(result$counts$doc_id, names(nominal_infinitive_texts()))
   expect_equal(result$counts$f_15_gerunds, expected)
   nominal <- result$evidence[result$evidence$feature == "f_15_gerunds", ]
@@ -20,11 +22,12 @@ expect_nominal_infinitive_baseline <- function(tokens) {
                                 c("f_14_nominalizations", "f_16_other_nouns", "f_24_infinitives"), ]
   keys <- c("doc_id", "sentence_id", "token_id")
   expect_equal(nrow(dplyr::inner_join(nominal, competing, by = keys)), 0L)
-  audit <- audit_features(tokens, feature = "f_15_gerunds")
+  audit <- audit_fixture(tokens, feature = "f_15_gerunds")
   expect_equal(tabulate(match(audit$doc_id, result$counts$doc_id), nbins = nrow(result$counts)),
                expected)
   expect_equal(tolower(audit$keyword),
-               c("saber", "fumar", "comer", "caminar", "dormir", "cantar", "comer", "beber"))
+               c("saber", "fumar", "comer", "caminar", "dormir", "cantar", "comer", "beber",
+                 "fumar", "fumar"))
 }
 
 test_that("noun-like infinitives move into f_15 without retagging or duplicate noun counts", {
@@ -41,13 +44,13 @@ test_that("noun-like infinitives move into f_15 without retagging or duplicate n
   spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
   class(spacy) <- c("spacyr_parsed", "data.frame")
   for (input in list(tokens, spacy)) {
-    raw <- biber(input, measure = "none", normalize = FALSE)
+    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
     expect_equal(raw$f_15_gerunds, c(1, 1))
     expect_equal(raw$f_14_nominalizations, c(0, 0))
     expect_equal(raw$f_16_other_nouns, c(0, 0))
     expect_equal(raw$f_24_infinitives, c(0, 0))
-    expect_equal(raw$n_tokens, c(2, 2))
-    expect_equal(biber(input, measure = "none")$f_15_gerunds, c(500, 500))
+    expect_equal(word_tokens(input), c(2, 2))
+    expect_equal(biber_fixture(input, measure = "none")$f_15_gerunds, c(500, 500))
   }
   result <- pseudobibeR.es:::biber_es_traced(tokens, measure = "none", normalize = FALSE)
   nominal <- result$evidence[result$evidence$feature == "f_15_gerunds", ]
@@ -71,9 +74,10 @@ test_that("articles do not nominalize a verbal infinitive with objects or adverb
     "bare", c("Fumar", "perjudica"), c("fumar", "perjudicar"), c("VERB", "VERB"),
     c(2, 0), c("csubj", "root"), c("VerbForm=Inf", "VerbForm=Fin")
   )
-  raw <- biber(rbind(object, adverb, bare), measure = "none", normalize = FALSE)
-  expect_equal(raw$f_15_gerunds, c(0, 0, 0))
-  expect_equal(raw$f_24_infinitives, c(1, 1, 1))
+  raw <- biber_fixture(rbind(object, adverb, bare), measure = "none", normalize = FALSE)
+  # A preverbal subject infinitive is nominal; a root infinitive stays verbal.
+  expect_equal(raw$f_15_gerunds, c(0, 0, 1))
+  expect_equal(raw$f_24_infinitives, c(1, 1, 0))
   expect_equal(raw$f_16_other_nouns[1], 1)
 })
 
@@ -84,7 +88,7 @@ test_that("ordinary suffix lookalikes and plural nouns are not nominal infinitiv
     c("DET", "NOUN", "DET", "NOUN", "DET", "NOUN"),
     c(2, 0, 4, 0, 6, 0), c("det", "root", "det", "root", "det", "root")
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_15_gerunds, 0)
   expect_equal(raw$f_16_other_nouns, 3)
 })
@@ -96,7 +100,7 @@ test_that("productive verbal infinitives and accented -ir forms have nominal cov
     c(2, 0, 4, 0), c("det", "root", "det", "root"),
     c(NA, "VerbForm=Inf", NA, NA)
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_15_gerunds, 2)
   expect_equal(raw$f_24_infinitives, 0)
   expect_equal(raw$f_16_other_nouns, 0)
@@ -108,12 +112,12 @@ test_that("nominal coordination shares context but verbal arguments keep a group
     c("DET", "VERB", "CCONJ", "VERB"), c(2, 0, 4, 2),
     c("det", "root", "cc", "conj"), c(NA, "VerbForm=Inf", NA, "VerbForm=Inf")
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_15_gerunds, 2)
   expect_equal(raw$f_24_infinitives, 0)
   object <- contract_clause("coord", "vino", "vino", "NOUN", 4, "obj")
   object$token_id <- "5"
-  raw <- biber(rbind(tokens, object), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(tokens, object), measure = "none", normalize = FALSE)
   expect_equal(raw$f_15_gerunds, 0)
   expect_equal(raw$f_24_infinitives, 2)
 })
@@ -130,7 +134,7 @@ test_that("genitive noun modifiers and nominal copular predicates remain eligibl
     c("NOUN", "AUX", "DET", "VERB"), c(4, 4, 4, 0),
     c("nsubj", "cop", "det", "root"), c(NA, "VerbForm=Fin", NA, "VerbForm=Inf")
   )
-  raw <- biber(rbind(tokens, predicate), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(tokens, predicate), measure = "none", normalize = FALSE)
   expect_equal(raw$f_15_gerunds, c(1, 1))
   expect_equal(raw$f_24_infinitives, c(0, 0))
   expect_equal(raw$f_16_other_nouns[1], 1)
@@ -143,7 +147,7 @@ test_that("recovered nominal infinitive subjects are not impersonal clausal subj
     c("cop", "root", "det", "csubj"),
     c("VerbForm=Fin|Person=3|Number=Sing", NA, NA, "VerbForm=Inf")
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_15_gerunds, 1)
   expect_equal(raw$f_24_infinitives, 0)
   expect_equal(raw$f_09_pronoun_it, 0)
@@ -155,12 +159,12 @@ test_that("nominal cues remain sentence/document-local and support word-ID gaps"
     c(7, 0), c("det", "root")
   )
   tokens$token_id <- c("2", "7")
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_15_gerunds, 1)
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_15_gerunds, 1)
   tokens$sentence_id[1] <- 2L
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_15_gerunds, 0)
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_15_gerunds, 0)
   tokens$sentence_id <- 1L
   tokens$doc_id[1] <- "unrelated"
-  expect_true(all(biber(tokens, measure = "none", normalize = FALSE)$f_15_gerunds == 0))
+  expect_true(all(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_15_gerunds == 0))
 })
 
 test_that("Spanish-GSD recognizes the noun-like nominal infinitive baseline", {
@@ -176,7 +180,7 @@ test_that("shipped f_15 examples distinguish a nominal infinitive from a verbal 
   tokens <- udpipe::udpipe_annotate(
     .fc_ud(), x = examples$example, doc_id = paste0("example_", seq_len(nrow(examples)))
   )
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_15_gerunds,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_15_gerunds,
                examples$count)
 })
 test_that("live Spanish spaCy recognizes the same noun-like nominal infinitive baseline", {

@@ -50,7 +50,7 @@ run_biber <- function(text, normalize = FALSE) {
   skip_if_not_installed("udpipe")
   ud <- .fc_ud()
   parsed <- as.data.frame(udpipe::udpipe_annotate(ud, x = text))
-  suppressMessages(biber(parsed, measure = "TTR", normalize = normalize))
+  suppressMessages(biber_fixture(parsed, measure = "TTR", normalize = normalize))
 }
 
 # nolint end

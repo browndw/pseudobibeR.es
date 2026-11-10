@@ -20,7 +20,7 @@ UDPipe annotations requires the suggested `udpipe` package.
 ```{r}
 library(pseudobibeR.es)
 features <- biber(udpipe_samples, measure = "TTR", normalize = FALSE)
-features[, c("doc_id", "f_01_past_tense", "f_18_by_passives", "n_tokens")]
+features[, c("doc_id", "f_01_past_tense", "f_18_by_passives")]
 audit_features(udpipe_samples, feature = "f_18_by_passives")
 ```
 
@@ -55,10 +55,11 @@ exercise the Spanish spaCy model, but do not establish corpus-level accuracy.
 
 ## Interpretation
 
-`normalize = TRUE` divides counts by the document's `n_tokens` and multiplies by
-1,000. Function words count in that denominator; punctuation, symbols, spaces,
-and UD multiword-token containers do not. `n_lex_tokens` is a separate descriptive
-total, not the denominator. The two lexical metrics are not normalized.
+`normalize = TRUE` divides counts by the document's number of word tokens and
+multiplies by 1,000. Function words and spelled-out numerals count in that
+denominator; punctuation, symbols, spaces, digit-final numerals (`42`) and UD
+multiword-token containers do not, as in the English and French packages. The
+two lexical metrics are not normalized.
 Tokenization remains parser-specific: a contraction or enclitic retained as
 one spaCy token counts once, whereas supplied UD component words count
 separately. The extractor does not infer a missing decomposition.
@@ -72,7 +73,7 @@ Spelled-out numerals remain words; dictionary expressions are not compounded.
 
 MATTR is the default; if any document has fewer than 200 retained diversity
 tokens, the whole supplied corpus uses TTR, with one message. The threshold
-population therefore differs from `n_tokens`, which includes number words.
+population uses the same word tokens as the normalization denominator.
 Thus, each document's value is calculated using the same selected measure.
 Explicitly selected TTR, CTTR, and MSTTR are retained throughout the corpus.
 For MSTTR, `quanteda.textstats` may shorten its common segment length and warns.
@@ -82,7 +83,9 @@ use the same measure across all compared corpora before scaling.
 Documents with no retained diversity tokens receive `NA` for f_43 and an
 identifying warning, rather than a fabricated score.
 
-f_28 is zero by compatibility convention, not a measured absence.
+f_28 is zero by compatibility convention, not a measured absence. Standard
+Spanish has no productive postnominal gerund functioning as a reduced relative;
+that function is expressed by full relative clauses (f_29-f_32).
 `f_59_contractions` counts a bounded inventory of colloquial written reductions,
 not ordinary `al/del` or every apostrophe. Surface/span lookup supports `pa`
 forms, `onde/nde/onde's/ontas` and reduced `estar` forms despite inconsistent

@@ -3,15 +3,43 @@ if (!requireNamespace("yaml", quietly = TRUE) ||
     !requireNamespace("udpipe", quietly = TRUE)) {
   stop("Install 'yaml' and 'udpipe' before rebuilding package data.")
 }
+# Keep YAML 1.1 boolean words (no, y, si, on...) as literal strings.
+read_inventory <- function(path) {
+  keep <- function(x) x
+  yaml::read_yaml(path, handlers = list("bool#yes" = keep, "bool#no" = keep))
+}
 normalize_values <- function(values, phrases = FALSE) {
+  values <- unlist(values, use.names = FALSE)
   values <- stringi::stri_trans_tolower(trimws(as.character(values)))
   values <- values[!is.na(values) & nzchar(values)]
   if (phrases) values <- gsub("\\s+", "_", values)
   sort(unique(values))
 }
-spec <- yaml::read_yaml("data-raw/dict.yaml")
-dict <- quanteda::dictionary(lapply(spec, normalize_values, phrases = TRUE))
-word_lists <- lapply(yaml::read_yaml("data-raw/word_lists.yaml"), normalize_values)
+add_accent_twins <- function(values, contrastive) {
+  if (!length(values)) return(values)
+  decomposed <- stringi::stri_trans_nfd(values)
+  twins <- stringi::stri_trans_nfc(
+    stringi::stri_replace_all_regex(decomposed, "[\\u0300\\u0301\\u0302\\u0308\\u0327]", "")
+  )
+  # Check each word of a phrase: a twin is dropped when any word that lost an
+  # accent becomes a contrastive form (tout_à must not yield tout_a).
+  collides <- mapply(function(original, twin) {
+    a <- strsplit(original, "[_ ]")[[1]]
+    b <- strsplit(twin, "[_ ]")[[1]]
+    any(a != b & b %in% contrastive)
+  }, values, twins, USE.NAMES = FALSE)
+  twins <- twins[twins != values & !collides]
+  sort(unique(c(values, twins)))
+}
+spec <- read_inventory("data-raw/dict.yaml")
+word_lists <- lapply(read_inventory("data-raw/word_lists.yaml"), normalize_values)
+contrastive <- word_lists$accent_contrastive_forms
+exact_lists <- c("accent_contrastive_forms", "resumptive_first_person_forms")
+twin_lists <- setdiff(names(word_lists), exact_lists)
+word_lists[twin_lists] <- lapply(word_lists[twin_lists], add_accent_twins, contrastive)
+dict <- quanteda::dictionary(lapply(spec, function(values) {
+  add_accent_twins(normalize_values(values, phrases = TRUE), contrastive)
+}))
 phrases <- unlist(as.list(dict), use.names = FALSE)
 phrases <- phrases[grepl("_", phrases, fixed = TRUE)]
 word_lists$multiword_patterns <- sort(unique(gsub(

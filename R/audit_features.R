@@ -1,7 +1,8 @@
 #' Audit feature occurrences in annotated Spanish text
 #'
 #' @param tokens Annotated tokens, as accepted by [biber()].
-#' @param feature One or more canonical feature identifiers.
+#' @param feature One or more feature names: display names (see
+#'   [feature_names]) or shared identifiers.
 #' @param category A category letter (`"A"` through `"P"`) or its label in
 #'   `.feature_categories`. Supply exactly one of `feature` and `category`.
 #' @param sample_n Optional positive integer limiting the total number of rows.
@@ -10,6 +11,9 @@
 #' @param max_per_doc Optional positive integer limiting rows per document.
 #' @param window Non-negative integer number of context tokens on each side.
 #'
+#' @param feature_names `"language"` (default) to report features with the
+#'   Spanish display names in [feature_names], or `"shared"` for the identifiers
+#'   shared by the companion packages. `feature` accepts either name.
 #' @return An `audit_features_result` tibble with the French companion's
 #'   columns: `feature`, `category`, `doc_id`, `sentence_id`, `count`,
 #'   `token_count`, `match_type`, `left`, `keyword`, `right`, and `chunk`.
@@ -22,7 +26,8 @@
 #' @export
 audit_features <- function(tokens, feature = NULL, category = NULL,
                            sample_n = NULL, seed = NULL, max_per_doc = NULL,
-                           window = 5) {
+                           window = 5,
+                           feature_names = getOption("pseudobibeR.feature_names", "language")) {
   UseMethod("audit_features")
 }
 
@@ -30,37 +35,30 @@ audit_features <- function(tokens, feature = NULL, category = NULL,
 #' @export
 audit_features.udpipe_connlu <- function(tokens, feature = NULL, category = NULL,
                                          sample_n = NULL, seed = NULL,
-                                         max_per_doc = NULL, window = 5) {
-  audit_spanish_features(tokens, feature, category, sample_n, seed, max_per_doc,
+                                         max_per_doc = NULL, window = 5,
+                                         feature_names = getOption("pseudobibeR.feature_names", "language")) {
+  feature_names <- match_feature_names(feature_names)
+  feature <- shared_feature_ids(feature)
+  result <- audit_spanish_features(tokens, feature, category, sample_n, seed, max_per_doc,
                          window, "udpipe")
+  result$feature <- display_feature_names(result$feature, feature_names)
+  result
 }
 
 #' @rdname audit_features
 #' @export
 audit_features.spacyr_parsed <- function(tokens, feature = NULL, category = NULL,
                                          sample_n = NULL, seed = NULL,
-                                         max_per_doc = NULL, window = 5) {
-  audit_spanish_features(tokens, feature, category, sample_n, seed, max_per_doc,
+                                         max_per_doc = NULL, window = 5,
+                                         feature_names = getOption("pseudobibeR.feature_names", "language")) {
+  feature_names <- match_feature_names(feature_names)
+  feature <- shared_feature_ids(feature)
+  result <- audit_spanish_features(tokens, feature, category, sample_n, seed, max_per_doc,
                          window, "spacy")
+  result$feature <- display_feature_names(result$feature, feature_names)
+  result
 }
 
-#' @rdname audit_features
-#' @export
-audit_features.data.frame <- function(tokens, feature = NULL, category = NULL,
-                                      sample_n = NULL, seed = NULL,
-                                      max_per_doc = NULL, window = 5) {
-  engine <- if ("upos" %in% names(tokens)) "udpipe" else "spacy"
-  audit_spanish_features(tokens, feature, category, sample_n, seed, max_per_doc,
-                         window, engine)
-}
-
-#' @export
-audit_features.default <- function(tokens, feature = NULL, category = NULL,
-                                   sample_n = NULL, seed = NULL,
-                                   max_per_doc = NULL, window = 5) {
-  stop("'tokens' must be UDPipe annotations, spacyr annotations, or a data frame.",
-       call. = FALSE)
-}
 
 validate_audit_integer <- function(value, name, minimum = 0, optional = FALSE) {
   if (optional && is.null(value)) return(invisible(NULL))

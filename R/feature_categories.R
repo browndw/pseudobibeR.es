@@ -95,9 +95,10 @@
 #' The compatibility-zero feature (internal)
 #'
 #' Features that appear as columns in the \code{biber()} output for
-#' surface parity with \code{pseudobibeR.fr} but whose value is always
-#' 0 because detection is unavailable or its Spanish scope remains pending.
-#' Documented in the Spanish feature table and README.
+#' surface parity with the companion packages but whose value is always 0.
+#' f_28 is zero for a linguistic reason, not a missing detector: standard
+#' Spanish has no productive postnominal gerund functioning as a reduced
+#' relative (see the Spanish feature table).
 #'
 #' Used by \code{biber_es_traced()} and the tests to tell apart
 #' "detectable feature that gave count=0 in this text" (genuine absence) and
@@ -116,8 +117,9 @@
 #' \itemize{
 #'   \item \code{f_43_type_token}: type/token ratio (MATTR, TTR, CTTR or MSTTR
 #'         depending on the \code{measure} argument).
-#'   \item \code{f_44_mean_word_length}: mean length in characters of
-#'         all tokens except punctuation.
+#'   \item \code{f_44_mean_word_length}: mean length in letters of purely
+#'         alphabetic word tokens (numerals, hyphenated and apostrophe
+#'         forms excluded); \code{NA} if a document has none.
 #' }
 #'
 #' Metrics are document summaries rather than occurrence counts and are

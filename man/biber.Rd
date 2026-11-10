@@ -4,31 +4,27 @@
 \alias{biber}
 \alias{biber.udpipe_connlu}
 \alias{biber.spacyr_parsed}
-\alias{biber.data.frame}
 \title{Extract Biber features from annotated Spanish text}
 \usage{
 biber(
   tokens,
   measure = c("MATTR", "TTR", "CTTR", "MSTTR", "none"),
-  normalize = TRUE
+  normalize = TRUE,
+  feature_names = getOption("pseudobibeR.feature_names", "language")
 )
 
 \method{biber}{udpipe_connlu}(
   tokens,
   measure = c("MATTR", "TTR", "CTTR", "MSTTR", "none"),
-  normalize = TRUE
+  normalize = TRUE,
+  feature_names = getOption("pseudobibeR.feature_names", "language")
 )
 
 \method{biber}{spacyr_parsed}(
   tokens,
   measure = c("MATTR", "TTR", "CTTR", "MSTTR", "none"),
-  normalize = TRUE
-)
-
-\method{biber}{data.frame}(
-  tokens,
-  measure = c("MATTR", "TTR", "CTTR", "MSTTR", "none"),
-  normalize = TRUE
+  normalize = TRUE,
+  feature_names = getOption("pseudobibeR.feature_names", "language")
 )
 }
 \arguments{
@@ -47,15 +43,20 @@ MATTR falls back to TTR for the entire corpus, with one message.
 Explicitly selected TTR, CTTR, and MSTTR are retained for all documents.}
 
 \item{normalize}{Logical. Normalize counts per 1,000 UD word tokens,
-excluding punctuation, symbols, spaces, and multiword-token container
-rows. Function words are included. Metrics are never normalized.}
+excluding punctuation, symbols, spaces, digit-final numeric tokens
+(\code{42}), and multiword-token container rows. Function words and
+spelled-out numerals are included. Metrics are never normalized.}
+
+\item{feature_names}{\code{"language"} (default) to name columns with the
+Spanish display names in \link{feature_names}, or \code{"shared"} for the identifiers
+shared by the English, Spanish and French packages. Set
+\code{options(pseudobibeR.feature_names = "shared")} to change the default.}
 }
 \value{
-A data frame with one row per document, 67 feature columns
-(66 when \code{measure = "none"}), and \code{n_tokens} and \code{n_lex_tokens}.
-\code{n_tokens} is the normalization denominator. Lexical tokens are nouns,
-proper nouns, verbs, adjectives, and adverbs. The compatibility feature
-f_28_present_participle_whiz remains always zero.
+A data frame with one row per document: \code{doc_id} and the 67
+feature columns (66 when \code{measure = "none"}). The compatibility feature
+f_28_present_participle_whiz is always zero: standard Spanish has no
+productive postnominal gerund functioning as a reduced relative.
 }
 \description{
 Counts Spanish adaptations of Biber's lexicogrammatical features from
@@ -63,7 +64,9 @@ Universal Dependencies annotations. Parsing is performed separately.
 }
 \details{
 Feature identifiers match the English and French companion packages,
-but Spanish heuristics are language-specific. \code{f_09_pronoun_it} counts identified
+but Spanish heuristics are language-specific. Tense features count finite
+verbs and auxiliaries in any mood: f_03 includes the present subjunctive,
+as f_01 includes the imperfect subjunctive. \code{f_09_pronoun_it} counts identified
 impersonal predicates, anchored on existing words, not inferred null subjects
 or UD empty nodes. Existential haber stays in f_20; personal pro-drop,
 generic complements, ambiguous se, and neuter lo are outside the f_09 baseline.
@@ -72,9 +75,11 @@ enclitics) or lo mismo, not auxiliary/copular, causative, reflexive or overt
 nominal-object uses. Bare lo is structurally eligible without semantic
 antecedent resolution. Each occurrence is anchored on the supplied verb word;
 pronoun/noun counts and token populations remain independent.
-\code{f_15_gerunds} counts clear noun-like nominal infinitives, not all infinitival
-subjects. Infinitive/verb identity and nominal internal structure are required;
-endings or an article alone are insufficient. Qualifying occurrences are
+\code{f_15_gerunds} counts infinitives functioning as nouns: clear noun-like
+nominal infinitives (\verb{el saber}, \verb{su andar}) and infinitives heading a subject
+placed before their verb (\verb{Fumar perjudica}). Postposed subjects (\verb{Es importante descansar}), objects and prepositional infinitives remain f_24.
+Infinitive/verb identity is required; endings or an article alone are
+insufficient. Qualifying occurrences are
 excluded from f_14, f_16 and f_24 by word identity, without retagging input.
 Verbal infinitival clauses remain in f_24 when their source annotations
 qualify. Recognized nominal subjects do not license impersonal f_09.
@@ -91,7 +96,7 @@ Standard al/del, nominal determiner contexts and short nominal acronyms are
 excluded. Source POS/lemmas and word populations are not rewritten, even when
 models mis-tag reduction fragments or apostrophes.
 \code{f_60_that_deletion} measures bounded complement reduction under creer,
-pensar and esperar: infinitival or unmarked finite ccomp/xcomp clauses,
+pensar, esperar, decir, afirmar and asegurar (D-46): infinitival or unmarked finite ccomp/xcomp clauses,
 including clear coordination and auxiliary/copular clause-form projection.
 Overt introducers, interrogative complements and nominal infinitives are
 excluded. Each identified clause head contributes one occurrence, without
@@ -128,10 +133,11 @@ The English numeric pattern \verb{\\\\d_} removes numeric matches from the
 tagged stream, including digit-final surface forms; spelled-out numerals
 remain words. Dictionary phrases are not compounded for this metric.
 Retained tokens determine the 200-token fallback threshold, rather than
-the normalization denominator \code{n_tokens}, which still includes number words.
+the normalization denominator, which still includes spelled-out numerals.
 One lexical-diversity measure is used throughout each supplied corpus.
 For MSTTR, \code{quanteda.textstats} may shorten the common segment length
-for short documents and issues a warning. Mean word length uses UD word tokens.
+for short documents and issues a warning. Mean word length (f_44) uses purely alphabetic UD word tokens, unrounded;
+documents without any receive \code{NA}.
 Documents with no retained diversity tokens receive \code{NA} for
 \code{f_43_type_token}, with a warning identifying those documents.
 Documents retain their order of first appearance.

@@ -28,12 +28,12 @@ test_that("f60 includes infinitival and unmarked finite complement reductions", 
     dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats"),
     class = c("spacyr_parsed", "data.frame")
   ))) {
-    raw <- biber(input, measure = "none", normalize = FALSE)
+    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
     expect_equal(raw$f_60_that_deletion, rep(1, 5))
     expect_equal(raw$f_24_infinitives, c(1, 0, 1, 1, 0))
-    expect_equal(biber(input, measure = "none")$f_60_that_deletion,
+    expect_equal(biber_fixture(input, measure = "none")$f_60_that_deletion,
                  1000 / c(2, 2, 3, 3, 3))
-    audit <- audit_features(input, feature = "f_60_that_deletion", window = 0)
+    audit <- audit_fixture(input, feature = "f_60_that_deletion", window = 0)
     expect_equal(audit$keyword, c("ir", "ir", "entendido", "listo", "entendido"))
   }
   expect_identical(tokens, original)
@@ -59,7 +59,7 @@ test_that("f60 is not every infinitive, nonfinite clause or markerless clause", 
   tokens <- do.call(rbind, c(excluded, list(
     gerund, participle, unknown, root, subject, relative, adjunct, auxiliary
   )))
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_60_that_deletion,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_60_that_deletion,
                rep(0, length(excluded) + 8))
 })
 
@@ -82,18 +82,18 @@ test_that("overt clause introducers and indirect questions exclude reductions", 
   question$feats[2] <- "PronType=Int"
   question$feats[3] <- "VerbForm=Inf"
   tokens <- rbind(marked, preposition, question)
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_60_that_deletion,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_60_that_deletion,
                rep(0, 3))
   marked$upos[2] <- marked$xpos[2] <- "PRON"
   marked$dep_rel[2] <- "obj"
   marked$feats[2] <- "PronType=Rel"
-  expect_equal(biber(marked, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
+  expect_equal(biber_fixture(marked, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
   marked$token[2] <- marked$lemma[2] <- "quien"
-  expect_equal(biber(marked, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
-  expect_equal(biber(question, measure = "none", normalize = FALSE)$f_23_wh_clause, 1)
+  expect_equal(biber_fixture(marked, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
+  expect_equal(biber_fixture(question, measure = "none", normalize = FALSE)$f_23_wh_clause, 1)
   question$upos[2] <- question$xpos[2] <- "PRON"
   question$feats[2] <- "PronType=Ind"
-  expect_equal(biber(question, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
+  expect_equal(biber_fixture(question, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
 })
 
 test_that("coordinated complements inherit governors and overt introducers", {
@@ -114,9 +114,9 @@ test_that("coordinated complements inherit governors and overt introducers", {
   mixed$doc_id <- "own_marker"
   mixed$head_token_id[2] <- "5"
   mixed$feats[3] <- "VerbForm=Inf"
-  raw <- biber(rbind(tokens, marked, mixed), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(tokens, marked, mixed), measure = "none", normalize = FALSE)
   expect_equal(raw$f_60_that_deletion, c(2, 0, 1))
-  expect_equal(nrow(audit_features(tokens, feature = "f_60_that_deletion")), 2L)
+  expect_equal(nrow(audit_fixture(tokens, feature = "f_60_that_deletion")), 2L)
 })
 
 test_that("nominal infinitives and nested overt complements do not inflate f60", {
@@ -131,7 +131,7 @@ test_that("nominal infinitives and nested overt complements do not inflate f60",
     c(0, 1, 4, 2), c("root", "xcomp", "mark", "ccomp"),
     c("VerbForm=Fin", "VerbForm=Inf", NA, "VerbForm=Fin")
   )
-  raw <- biber(rbind(nominal, nested), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(nominal, nested), measure = "none", normalize = FALSE)
   expect_equal(raw$f_60_that_deletion, c(0, 1))
   expect_equal(raw$f_15_gerunds, c(1, 0))
 })
@@ -140,16 +140,16 @@ test_that("complement links stay within documents and sentences and use supplied
   tokens <- reduction_clause("noncontiguous")
   tokens$token_id <- c("10", "30")
   tokens$head_token_id[2] <- "10"
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_60_that_deletion, 1)
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_60_that_deletion, 1)
   traced <- pseudobibeR.es:::biber_es_traced(tokens, measure = "none")
   expect_equal(traced$evidence$token_id[traced$evidence$feature == "f_60_that_deletion"],
                30L)
   separate <- tokens
   separate$sentence_id[2] <- 2L
-  expect_equal(biber(separate, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
+  expect_equal(biber_fixture(separate, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
   separate$sentence_id <- 1L
   separate$doc_id <- c("governor", "complement")
-  expect_equal(biber(separate, measure = "none", normalize = FALSE)$f_60_that_deletion,
+  expect_equal(biber_fixture(separate, measure = "none", normalize = FALSE)$f_60_that_deletion,
                c(0, 0))
 })
 
@@ -185,11 +185,11 @@ expect_reduced_complement_baseline <- function(tokens, finite_tail) {
   expect_equal(traced$counts$f_60_that_deletion, expected)
   rows <- traced$evidence[traced$evidence$feature == "f_60_that_deletion", ]
   expect_equal(anyDuplicated(rows[c("doc_id", "sentence_id", "token_id")]), 0L)
-  audit <- audit_features(tokens, feature = "f_60_that_deletion")
+  audit <- audit_fixture(tokens, feature = "f_60_that_deletion")
   expect_equal(audit$doc_id, rows$doc_id)
   expect_equal(tabulate(match(audit$doc_id, traced$counts$doc_id), nbins = 20), expected)
-  normalized <- biber(tokens, measure = "TTR", normalize = TRUE)
-  expect_equal(normalized$f_60_that_deletion, 1000 * expected / traced$counts$n_tokens)
+  normalized <- biber_fixture(tokens, measure = "TTR", normalize = TRUE)
+  expect_equal(normalized$f_60_that_deletion, 1000 * expected / word_tokens(tokens))
 }
 
 test_that("native GSD captures bounded reductions without repairing lost complement analyses", {
@@ -224,10 +224,10 @@ test_that("native spaCy captures the same core reductions with explicit finite p
 test_that("shipped reduction examples distinguish complements from overt clauses and modals", {
   examples <- pseudobibeR.es::spanish_examples
   examples <- examples[examples$feature == "f_60_that_deletion", ]
-  expect_equal(nrow(examples), 5L)
+  expect_equal(nrow(examples), 8L)
   tokens <- udpipe::udpipe_annotate(
     .fc_ud(), x = examples$example, doc_id = paste0("example_", seq_len(nrow(examples)))
   )
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_60_that_deletion,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_60_that_deletion,
                examples$count)
 })

@@ -7,13 +7,13 @@ test_that("nominalizations and other nouns partition UD noun words including hyp
     c("NOUN", "NOUN", "NOUN", "PROPN", "NOUN", "ADJ"),
     rep(0, 6), rep("root", 6)
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_14_nominalizations, 2)
   expect_equal(raw$f_16_other_nouns, 3)
   expect_equal(raw$f_14_nominalizations + raw$f_16_other_nouns, 5)
-  expect_setequal(audit_features(tokens, feature = "f_14_nominalizations")$keyword,
+  expect_setequal(audit_fixture(tokens, feature = "f_14_nominalizations")$keyword,
                   c("producciones", "riqueza"))
-  expect_setequal(audit_features(tokens, feature = "f_16_other_nouns")$keyword,
+  expect_setequal(audit_fixture(tokens, feature = "f_16_other_nouns")$keyword,
                   c("ciudades", "Concepcion", "coche-cama"))
 })
 
@@ -25,10 +25,10 @@ test_that("attributive adjectives retain hyphens and inherit coordination roles"
     c("NOUN", "ADJ", "CCONJ", "ADJ", "CCONJ", "ADJ"),
     c(0, 1, 4, 2, 6, 4), c("root", "amod", "cc", "conj", "cc", "conj")
   )
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_40_adj_attr, 3)
   expect_equal(raw$f_41_adj_pred, 0)
-  expect_setequal(audit_features(tokens, feature = "f_40_adj_attr")$keyword,
+  expect_setequal(audit_fixture(tokens, feature = "f_40_adj_attr")$keyword,
                   c("teorico-practico", "riguroso", "util"))
 })
 
@@ -48,18 +48,18 @@ test_that("predicative adjectives and their conjuncts are not fallback attributi
     c("ADJ", "AUX", "ADJ"), c(2, 0, 2), c("nsubj", "root", "attr")
   )
   tokens <- rbind(inverted, coordination, subject)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_40_adj_attr, c(0, 0, 0))
   expect_equal(raw$f_41_adj_pred, c(1, 3, 1))
   expect_setequal(
-    audit_features(tokens, feature = "f_41_adj_pred")$keyword,
+    audit_fixture(tokens, feature = "f_41_adj_pred")$keyword,
     c("famoso", "interesante", "util", "claro", "urgente")
   )
-  expect_equal(biber(tokens, measure = "none")$f_41_adj_pred,
-               1000 * c(1, 3, 1) / raw$n_tokens)
+  expect_equal(biber_fixture(tokens, measure = "none")$f_41_adj_pred,
+               1000 * c(1, 3, 1) / word_tokens(tokens))
   spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
   class(spacy) <- c("spacyr_parsed", "data.frame")
-  expect_equal(biber(spacy, measure = "none", normalize = FALSE), raw)
+  expect_equal(biber_fixture(spacy, measure = "none", normalize = FALSE), raw)
 })
 
 test_that("adjective coordination stays within sentences and documents", {
@@ -70,7 +70,7 @@ test_that("adjective coordination stays within sentences and documents", {
   tokens$sentence_id[3] <- 2L
   other <- tokens[3, ]
   other$doc_id <- "other"
-  raw <- biber(rbind(tokens, other), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(tokens, other), measure = "none", normalize = FALSE)
   expect_equal(raw$f_40_adj_attr, c(1, 0))
   expect_equal(raw$f_41_adj_pred, c(0, 0))
 })
@@ -87,9 +87,9 @@ test_that("the preposition inventory drives complete single-occurrence phrase au
     )
   })
   tokens <- do.call(rbind, clauses)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_39_prepositions, rep(1, length(phrases)))
-  audit <- audit_features(tokens, feature = "f_39_prepositions", window = 1)
+  audit <- audit_fixture(tokens, feature = "f_39_prepositions", window = 1)
   expect_setequal(audit$keyword, phrases)
   expect_equal(audit$left, rep("", length(phrases)))
   expect_equal(audit$right, rep("Ana", length(phrases)))
@@ -106,13 +106,13 @@ test_that("counted place and time phrases are excluded from f_42", {
     rep(0, 5), rep("dep", 5)
   )
   tokens <- rbind(place, time)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_04_place_adverbials, c(2, 0))
   expect_equal(raw$f_05_time_adverbials, c(0, 2))
   expect_equal(raw$f_42_adverbs, c(0, 0))
-  expect_setequal(audit_features(tokens, feature = "f_04_place_adverbials")$keyword,
+  expect_setequal(audit_fixture(tokens, feature = "f_04_place_adverbials")$keyword,
                   c("alrededor de", "aqui"))
-  expect_setequal(audit_features(tokens, feature = "f_05_time_adverbials")$keyword,
+  expect_setequal(audit_fixture(tokens, feature = "f_05_time_adverbials")$keyword,
                   c("de vez en cuando", "hoy"))
 })
 
@@ -129,11 +129,11 @@ test_that("dictionary phrases are contained-deduplicated and sentence-local", {
   split$doc_id <- "split"
   split$sentence_id <- c(1L, 2L)
   tokens <- rbind(degree, connector, split)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_46_downtoners, c(1, 0, 0))
   expect_equal(raw$f_45_conjuncts, c(0, 1, 0))
-  expect_equal(audit_features(tokens, feature = "f_46_downtoners")$keyword, "Un poco")
-  expect_equal(audit_features(tokens, feature = "f_45_conjuncts")$keyword, "Sin embargo")
+  expect_equal(audit_fixture(tokens, feature = "f_46_downtoners")$keyword, "Un poco")
+  expect_equal(audit_fixture(tokens, feature = "f_45_conjuncts")$keyword, "Sin embargo")
 })
 
 test_that("every lexical dictionary entry has an exact full-span occurrence", {
@@ -158,10 +158,15 @@ test_that("packaged preposition and nominalization inventories match their sourc
   path <- test_path("..", "..", "data-raw", "word_lists.yaml")
   skip_if_not(file.exists(path), "Development word-list source is not installed")
   source <- yaml::read_yaml(path)
+  contrastive <- word_lists$accent_contrastive_forms
   for (name in c("prepositions_compound", "nominalization_suffixes",
                 "nominalization_stoplist")) {
-    expected <- sort(unique(stringi::stri_trans_tolower(trimws(as.character(source[[name]])))))
-    expect_equal(sort(word_lists[[name]]), expected, info = name)
+    expected <- unique(stringi::stri_trans_tolower(trimws(as.character(source[[name]]))))
+    twins <- stringi::stri_trans_nfc(stringi::stri_replace_all_regex(
+      stringi::stri_trans_nfd(expected), "[\\u0300\\u0301\\u0302\\u0308\\u0327]", ""
+    ))
+    twins <- twins[twins != expected & !twins %in% contrastive]
+    expect_equal(sort(word_lists[[name]]), sort(unique(c(expected, twins))), info = name)
   }
 })
 
@@ -174,12 +179,12 @@ test_that("Spanish-GSD preserves coordinated adjective and prepositional contras
     noun = "El coche-cama es c\u00f3modo."
   )
   tokens <- udpipe::udpipe_annotate(model, x = texts, doc_id = names(texts))
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$doc_id, names(texts))
   expect_equal(raw$f_40_adj_attr, c(2, 0, 0, 0))
   expect_equal(raw$f_41_adj_pred, c(0, 2, 0, 1))
   expect_equal(raw$f_39_prepositions[3], 1)
   expect_equal(raw$f_16_other_nouns[4], 1)
-  audit <- audit_features(tokens, feature = "f_39_prepositions")
+  audit <- audit_fixture(tokens, feature = "f_39_prepositions")
   expect_equal(audit$keyword[audit$doc_id == "preposition"], "A excepci\u00f3n de")
 })

@@ -32,7 +32,7 @@
 #   f_61  Bounded resumptive prepositional relatives
 
 # -----------------------------------------------------------------------------
-# 1.  block_participial_clauses_es   f_24-f_27 (f_28 removed)
+# 1.  block_participial_clauses_es   f_24-f_27 (f_28 is a compatibility zero)
 # -----------------------------------------------------------------------------
 
 #' Participial and infinitive clause features (Spanish)
@@ -117,12 +117,16 @@ block_participial_clauses_es <- function(tokens, doc_ids, head_lookup, nominal_i
     ) %>%
     count_feature_traced("f_26_past_participle")
 
-  # f_28 (postnominal gerund / whiz-deletion) REMOVED:
-  # The Spanish gerund cannot work as a postnominal noun modifier;
-  # its use in that position is ungrammatical in standard Spanish. The
-  # equivalent function is carried out by full relative clauses (f_29/f_30).
-  # Mapping f_28 to those relatives would double the count. Untranslatable.
-  # See biber_espanol_completo.md sec. F_28.
+  # f_28 (postnominal gerund / whiz-deletion): compatibility zero.
+  # English f_28 is a productive, grammatical reduced relative ("the man
+  # standing there"). Standard Spanish has no such mechanism: the specifying
+  # postnominal gerund ("una caja conteniendo libros") is normatively
+  # incorrect (RAE/ASALE, NGLE) and mostly a calque. Accepted postnominal uses
+  # are not reduced relatives: lexicalized hirviendo/ardiendo, captions
+  # ("Colón llegando a América") and predicative gerunds with perception or
+  # representation verbs ("una foto de niños jugando"). The relative function
+  # is expressed by full relative clauses (f_29-f_32); remapping it would
+  # double count.
 
   counts <- doc_ids %>%
     dplyr::left_join(f24$counts, by = "doc_id") %>%
@@ -344,6 +348,8 @@ block_relatives_es <- function(tokens, doc_ids, head_lookup, subject_intransitiv
   # The antecedent is a neuter pronoun (eso, esto, ello, lo)
   sentence_rel_antecedents <- c("eso", "esto", "ello", "lo")
 
+  free_relative_lo <- free_relative_complements_es(tokens) %>%
+    dplyr::transmute(.data$doc_id, .data$sentence_id, antecedent_id = .data$token_id_int)
   f34 <- rel_tokens %>%
     dplyr::filter(
       .data$lemma %in% c("que", "cual", "cuales"),
@@ -365,7 +371,8 @@ block_relatives_es <- function(tokens, doc_ids, head_lookup, subject_intransitiv
     ) %>%
     dplyr::filter(
       .data$ant_lemma %in% sentence_rel_antecedents
-    )
+    ) %>%
+    dplyr::anti_join(free_relative_lo, by = c("doc_id", "sentence_id", "antecedent_id"))
 
   # Positional heuristic branch (biber_espanol_completo.md §f_34): "comma +
   # lo que / lo cual in clause-initial position" is a strong signal of a
@@ -676,7 +683,10 @@ block_clause_embedding_es <- function(tokens, doc_ids, head_lookup,
       gp_pos = .data$pos
     )
 
+  free_relative_que <- free_relative_complements_es(tokens) %>%
+    dplyr::transmute(.data$doc_id, .data$sentence_id, token_id_int = .data$que_id)
   que_mark_base <- tokens %>%
+    dplyr::anti_join(free_relative_que, by = c("doc_id", "sentence_id", "token_id_int")) %>%
     dplyr::filter(
       .data$lemma == "que",
       .data$pos   == "SCONJ",
@@ -701,9 +711,10 @@ block_clause_embedding_es <- function(tokens, doc_ids, head_lookup,
       by = c("doc_id", "sentence_id", "gp_id")
     )
 
+  # The complement clause may be headed by any predicate, including a copular
+  # nominal or adjectival one ("Creo que es una buena idea").
   f21 <- que_mark_base %>%
     dplyr::filter(
-      dplyr::coalesce(.data$head_pos, "") %in% c("VERB", "AUX"),
       stringr::str_detect(dplyr::coalesce(.data$head_dep_rel, ""),
                           "^(ccomp|xcomp|csubj)($|:)"),
       # NEW: the grandparent (real predicate) must be a VERB/AUX, not an ADJECTIVE.
@@ -740,6 +751,8 @@ block_clause_embedding_es <- function(tokens, doc_ids, head_lookup,
       wh_head_dep = .data$dep_rel
     )
 
+  # Free relatives with lo que complementing a verb count once, on lo.
+  free_relatives <- free_relative_complements_es(tokens)
   f23 <- interrogative_clause_tokens(tokens) %>%
     dplyr::filter(
       stringr::str_detect(
@@ -763,6 +776,7 @@ block_clause_embedding_es <- function(tokens, doc_ids, head_lookup,
       # when the wh-word introduces a relative (case "El equipo que fue asignado").
       !dplyr::coalesce(.data$wh_head_dep, "") %in% c("acl", "acl:relcl")
     ) %>%
+    dplyr::bind_rows(free_relatives) %>%
     count_feature_traced("f_23_wh_clause")
 
   # -- f_35  Causal ----------------------------------------------------------
@@ -912,6 +926,59 @@ block_clause_embedding_es <- function(tokens, doc_ids, head_lookup,
   )
 
   make_block_result(counts = counts, evidence = evidence)
+}
+
+#' Free relatives introduced by lo que that complement a verb (internal)
+#'
+#' `Sé lo que hiciste`, `Me gusta lo que haces`: lo immediately followed by que,
+#' not sentence-initial and not after punctuation (sentential relatives, f_34),
+#' governed by a lexical verb either directly (lo as its argument) or through
+#' the relative clause (Spanish-GSD attaches que as a mark of a ccomp clause).
+#'
+#' @param tokens Prepared tokens.
+#' @return Rows for lo, with `token` set to the span (`lo que`) and `que_id`.
+#' @keywords internal
+#' @noRd
+free_relative_complements_es <- function(tokens) {
+  keys <- c("doc_id", "sentence_id")
+  context <- tokens %>%
+    dplyr::group_by(.data$doc_id, .data$sentence_id) %>%
+    dplyr::arrange(.data$token_id_int, .by_group = TRUE) %>%
+    dplyr::mutate(
+      prev_pos = dplyr::lag(.data$pos),
+      next_token = dplyr::lead(stringr::str_to_lower(.data$token)),
+      que_id = dplyr::lead(.data$token_id_int),
+      que_head = dplyr::lead(.data$head_token_id_int)
+    ) %>%
+    dplyr::ungroup()
+  attrs <- tokens %>%
+    dplyr::transmute(.data$doc_id, .data$sentence_id, id = .data$token_id_int,
+                     pos_of = .data$pos, dep_of = .data$dep_rel,
+                     head_of = .data$head_token_id_int)
+  # Verb arguments only: prepositional free relatives (en lo que...) are excluded.
+  argument <- "^(obj|nsubj|ccomp|xcomp|csubj)"
+  context %>%
+    dplyr::filter(
+      stringr::str_to_lower(.data$token) == "lo",
+      .data$next_token %in% "que",
+      !is.na(.data$prev_pos), .data$prev_pos != "PUNCT"
+    ) %>%
+    dplyr::left_join(dplyr::rename(attrs, lo_head_pos = "pos_of", lo_head_dep = "dep_of",
+                                   lo_head_head = "head_of"),
+                     by = c(keys, "head_token_id_int" = "id")) %>%
+    dplyr::left_join(dplyr::rename(attrs, clause_pos = "pos_of", clause_dep = "dep_of",
+                                   clause_head = "head_of"),
+                     by = c(keys, "que_head" = "id")) %>%
+    dplyr::left_join(dplyr::select(dplyr::rename(attrs, governor_pos = "pos_of"),
+                                   "doc_id", "sentence_id", "id", "governor_pos"),
+                     by = c(keys, "clause_head" = "id")) %>%
+    dplyr::filter(
+      (stringr::str_detect(dplyr::coalesce(.data$dep_rel, ""), argument) &
+         .data$lo_head_pos %in% "VERB") |
+        (stringr::str_detect(dplyr::coalesce(.data$clause_dep, ""), argument) &
+           .data$governor_pos %in% "VERB")
+    ) %>%
+    dplyr::mutate(token = paste(.data$token, "que"))
 }
 
 interrogative_clause_tokens <- function(tokens, strict = TRUE) {

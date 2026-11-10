@@ -2,7 +2,7 @@
 # Synthetic tests for Biber features in Spanish (without UDPipe)
 #
 # The tokens are built by hand in UDPipe format (upos/xpos columns).
-# biber() renames upos→pos and xpos→tag before calling parse_biber_features().
+# biber_fixture() renames upos→pos and xpos→tag before calling parse_biber_features().
 #
 # Convention: each test checks ONE feature with a minimal sentence.
 # nolint start: line_length_linter, object_name_linter
@@ -15,7 +15,7 @@ make_es_tokens <- function(...) {
 }
 
 run_es <- function(tokens, normalize = FALSE) {
-  biber(tokens, measure = "none", normalize = normalize)
+  biber_fixture(tokens, measure = "none", normalize = normalize)
 }
 
 # ─── Verb tense ───────────────────────────────────────────────────────────

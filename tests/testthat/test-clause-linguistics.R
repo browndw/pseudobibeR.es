@@ -18,17 +18,34 @@ test_that("que complement clauses do not absorb purpose or conditional clauses",
     c("ADJ", "SCONJ", "VERB"), c(0, 3, 1), c("root", "mark", "csubj")
   )
   tokens <- rbind(complement, purpose, conditional, adjective)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_21_that_verb_comp, c(1, 0, 0, 0))
   expect_equal(raw$f_22_that_adj_comp, c(0, 0, 0, 1))
   expect_equal(raw$f_37_if, c(0, 0, 1, 0))
   expect_equal(raw$f_38_other_adv_sub, c(0, 1, 0, 0))
   for (feature in c("f_21_that_verb_comp", "f_22_that_adj_comp", "f_37_if",
                     "f_38_other_adv_sub")) {
-    audit <- audit_features(tokens, feature = feature)
+    audit <- audit_fixture(tokens, feature = feature)
     expect_equal(tabulate(match(audit$doc_id, raw$doc_id), nbins = nrow(raw)),
                  raw[[feature]])
   }
+})
+
+test_that("verb complement clauses may be headed by a copular predicate", {
+  copular <- contract_clause(
+    "copular", c("creo", "que", "es", "una", "idea"), c("creer", "que", "ser", "uno", "idea"),
+    c("VERB", "SCONJ", "AUX", "DET", "NOUN"), c(0, 5, 5, 5, 1),
+    c("root", "mark", "cop", "det", "ccomp")
+  )
+  adjectival <- contract_clause(
+    "adjectival", c("dijo", "que", "estaba", "cansado"),
+    c("decir", "que", "estar", "cansado"), c("VERB", "SCONJ", "AUX", "ADJ"),
+    c(0, 4, 4, 1), c("root", "mark", "cop", "ccomp")
+  )
+  tokens <- rbind(copular, adjectival)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
+  expect_equal(raw$f_21_that_verb_comp, c(1, 1))
+  expect_equal(raw$f_22_that_adj_comp, c(0, 0))
 })
 
 test_that("infinitive morphology includes bare roots and auxiliary infinitives", {
@@ -42,10 +59,10 @@ test_that("infinitive morphology includes bare roots and auxiliary infinitives",
   noun$doc_id <- "nominal"
   noun$upos <- noun$xpos <- "NOUN"
   tokens <- rbind(bare, auxiliary, noun)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_24_infinitives, c(1, 1, 0))
   expect_equal(raw$f_15_gerunds, rep(0, 3))
-  expect_setequal(audit_features(tokens, feature = "f_24_infinitives")$keyword,
+  expect_setequal(audit_fixture(tokens, feature = "f_24_infinitives")$keyword,
                   c("fumar", "ser"))
 })
 
@@ -60,10 +77,10 @@ test_that("postnominal participles do not also count as adverbial participles", 
     c("VerbForm=Part", "VerbForm=Fin")
   )
   tokens <- rbind(modifier, absolute)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_26_past_participle, c(0, 1))
   expect_equal(raw$f_27_past_participle_whiz, c(1, 0))
-  expect_equal(audit_features(tokens, feature = "f_26_past_participle")$doc_id, "absolute")
+  expect_equal(audit_fixture(tokens, feature = "f_26_past_participle")$doc_id, "absolute")
 })
 
 test_that("pied-piping needs a nominal relative and takes precedence over object relatives", {
@@ -90,17 +107,17 @@ test_that("pied-piping needs a nominal relative and takes precedence over object
   relative_que$dep_rel[3] <- "mark"
   relative_que$feats[3] <- NA_character_
   tokens <- rbind(relative, relative_que, complement, free_relative)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_33_pied_piping, c(1, 1, 0, 0))
   expect_equal(raw$f_30_that_obj, rep(0, 4))
   expect_equal(raw$f_29_that_subj, rep(0, 4))
   expect_equal(raw$f_31_wh_subj, rep(0, 4))
   expect_equal(raw$f_32_wh_obj, rep(0, 4))
-  expect_setequal(audit_features(tokens, feature = "f_33_pied_piping")$doc_id,
+  expect_setequal(audit_fixture(tokens, feature = "f_33_pied_piping")$doc_id,
                   c("relative", "relative_que"))
   spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
   class(spacy) <- c("spacyr_parsed", "data.frame")
-  expect_equal(biber(spacy, measure = "none", normalize = FALSE), raw)
+  expect_equal(biber_fixture(spacy, measure = "none", normalize = FALSE), raw)
 })
 
 test_that("nonprepositional wh relatives retain subject and object classifications", {
@@ -115,7 +132,7 @@ test_that("nonprepositional wh relatives retain subject and object classificatio
   nonrelative <- object
   nonrelative$doc_id <- "nonrelative"
   nonrelative$dep_rel[3] <- "ccomp"
-  raw <- biber(rbind(subject, object, nonrelative), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(rbind(subject, object, nonrelative), measure = "none", normalize = FALSE)
   expect_equal(raw$f_29_that_subj, c(0, 0, 0))
   expect_equal(raw$f_30_that_obj, c(0, 0, 0))
   expect_equal(raw$f_31_wh_subj, c(1, 0, 0))
@@ -130,9 +147,9 @@ test_that("conditional si is not suppressed merely by a communication main verb"
   indirect$doc_id <- "indirect"
   indirect$dep_rel[2] <- "ccomp"
   tokens <- rbind(conditional, indirect)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_37_if, c(1, 0))
-  expect_equal(audit_features(tokens, feature = "f_37_if")$doc_id, "conditional")
+  expect_equal(audit_fixture(tokens, feature = "f_37_if")$doc_id, "conditional")
 })
 
 test_that("conditional phrases are counted once with complete sentence-local evidence", {
@@ -150,10 +167,10 @@ test_that("conditional phrases are counted once with complete sentence-local evi
   separated$doc_id <- "separated"
   separated$sentence_id[4:5] <- 2L
   tokens <- rbind(phrase, comparison, separated)
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_37_if, c(1, 0, 0))
   expect_equal(raw$f_38_other_adv_sub[1], 0)
-  audit <- audit_features(tokens, feature = "f_37_if", window = 1)
+  audit <- audit_fixture(tokens, feature = "f_37_if", window = 1)
   expect_equal(audit$doc_id, "phrase")
   expect_equal(audit$keyword, "a menos que")
   expect_equal(audit$left, "sale")
@@ -170,7 +187,7 @@ test_that("Spanish-GSD preserves the validated clause contrasts", {
     se_perfect = "Se han publicado los informes."
   )
   tokens <- udpipe::udpipe_annotate(model, x = texts, doc_id = names(texts))
-  raw <- biber(tokens, measure = "none", normalize = FALSE)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$doc_id, names(texts))
   expect_equal(raw$f_37_if, c(1, 0, 0, 0, 0))
   expect_equal(raw$f_33_pied_piping, rep(0, 5))
@@ -178,4 +195,44 @@ test_that("Spanish-GSD preserves the validated clause contrasts", {
   expect_equal(raw$f_27_past_participle_whiz[4], 1)
   expect_equal(raw$f_17_agentless_passives[5], 1)
   expect_equal(raw$f_02_perfect_aspect[5], 1)
+})
+
+test_that("lo que free relatives complementing a verb count once in f_23", {
+  complement <- contract_clause(
+    "complement", c("s\u00e9", "lo", "que", "hiciste"), c("saber", "lo", "que", "hacer"),
+    c("VERB", "PRON", "SCONJ", "VERB"), c(0, 4, 4, 1), c("root", "det", "mark", "ccomp")
+  )
+  subject <- contract_clause(
+    "subject", c("me", "gusta", "lo", "que", "haces"), c("yo", "gustar", "lo", "que", "hacer"),
+    c("PRON", "VERB", "PRON", "SCONJ", "VERB"), c(2, 0, 2, 5, 3),
+    c("iobj", "root", "nsubj", "mark", "acl:relcl")
+  )
+  sentential <- contract_clause(
+    "sentential", c("lleg\u00f3", "tarde", ",", "lo", "que", "molest\u00f3"),
+    c("llegar", "tarde", ",", "lo", "que", "molestar"),
+    c("VERB", "ADV", "PUNCT", "PRON", "SCONJ", "VERB"), c(0, 1, 1, 6, 6, 1),
+    c("root", "advmod", "punct", "det", "mark", "parataxis")
+  )
+  copular <- contract_clause(
+    "copular", c("lo", "que", "dices", "es", "verdad"), c("lo", "que", "decir", "ser", "verdad"),
+    c("PRON", "SCONJ", "VERB", "AUX", "NOUN"), c(0, 3, 1, 1, 1),
+    c("root", "mark", "acl:relcl", "cop", "nsubj")
+  )
+  tokens <- rbind(complement, subject, sentential, copular)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
+  expect_equal(raw$f_23_wh_clause, c(1, 1, 0, 0))
+  expect_equal(raw$f_21_that_verb_comp, c(0, 0, 0, 0))
+  expect_equal(raw$f_34_sentence_relatives[1:2], c(0, 0))
+  audit <- audit_fixture(tokens, feature = "f_23_wh_clause")
+  expect_equal(audit$keyword, c("lo que", "lo que"))
+})
+
+test_that("Spanish-GSD lo que complements count in f_23, not f_21", {
+  model <- .fc_ud()
+  texts <- c(a = "No s\u00e9 lo que pas\u00f3.", b = "S\u00e9 lo que hiciste.",
+             c = "Lleg\u00f3 tarde, lo que molest\u00f3 a todos.")
+  raw <- biber_fixture(udpipe::udpipe_annotate(model, x = texts, doc_id = names(texts)),
+               measure = "none", normalize = FALSE)
+  expect_equal(raw$f_23_wh_clause, c(1, 1, 0))
+  expect_equal(raw$f_21_that_verb_comp, c(0, 0, 0))
 })

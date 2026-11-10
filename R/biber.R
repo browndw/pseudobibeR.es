@@ -17,17 +17,23 @@
 #'   MATTR falls back to TTR for the entire corpus, with one message.
 #'   Explicitly selected TTR, CTTR, and MSTTR are retained for all documents.
 #' @param normalize Logical. Normalize counts per 1,000 UD word tokens,
-#'   excluding punctuation, symbols, spaces, and multiword-token container
-#'   rows. Function words are included. Metrics are never normalized.
+#'   excluding punctuation, symbols, spaces, digit-final numeric tokens
+#'   (`42`), and multiword-token container rows. Function words and
+#'   spelled-out numerals are included. Metrics are never normalized.
 #'
-#' @return A data frame with one row per document, 67 feature columns
-#'   (66 when `measure = "none"`), and `n_tokens` and `n_lex_tokens`.
-#'   `n_tokens` is the normalization denominator. Lexical tokens are nouns,
-#'   proper nouns, verbs, adjectives, and adverbs. The compatibility feature
-#'   f_28_present_participle_whiz remains always zero.
+#' @param feature_names `"language"` (default) to name columns with the
+#'   Spanish display names in [feature_names], or `"shared"` for the identifiers
+#'   shared by the English, Spanish and French packages. Set
+#'   `options(pseudobibeR.feature_names = "shared")` to change the default.
+#' @return A data frame with one row per document: `doc_id` and the 67
+#'   feature columns (66 when `measure = "none"`). The compatibility feature
+#'   f_28_present_participle_whiz is always zero: standard Spanish has no
+#'   productive postnominal gerund functioning as a reduced relative.
 #' @details
 #' Feature identifiers match the English and French companion packages,
-#' but Spanish heuristics are language-specific. `f_09_pronoun_it` counts identified
+#' but Spanish heuristics are language-specific. Tense features count finite
+#' verbs and auxiliaries in any mood: f_03 includes the present subjunctive,
+#' as f_01 includes the imperfect subjunctive. `f_09_pronoun_it` counts identified
 #' impersonal predicates, anchored on existing words, not inferred null subjects
 #' or UD empty nodes. Existential haber stays in f_20; personal pro-drop,
 #' generic complements, ambiguous se, and neuter lo are outside the f_09 baseline.
@@ -36,9 +42,12 @@
 #' nominal-object uses. Bare lo is structurally eligible without semantic
 #' antecedent resolution. Each occurrence is anchored on the supplied verb word;
 #' pronoun/noun counts and token populations remain independent.
-#' `f_15_gerunds` counts clear noun-like nominal infinitives, not all infinitival
-#' subjects. Infinitive/verb identity and nominal internal structure are required;
-#' endings or an article alone are insufficient. Qualifying occurrences are
+#' `f_15_gerunds` counts infinitives functioning as nouns: clear noun-like
+#' nominal infinitives (`el saber`, `su andar`) and infinitives heading a subject
+#' placed before their verb (`Fumar perjudica`). Postposed subjects (`Es
+#' importante descansar`), objects and prepositional infinitives remain f_24.
+#' Infinitive/verb identity is required; endings or an article alone are
+#' insufficient. Qualifying occurrences are
 #' excluded from f_14, f_16 and f_24 by word identity, without retagging input.
 #' Verbal infinitival clauses remain in f_24 when their source annotations
 #' qualify. Recognized nominal subjects do not license impersonal f_09.
@@ -55,7 +64,7 @@
 #' excluded. Source POS/lemmas and word populations are not rewritten, even when
 #' models mis-tag reduction fragments or apostrophes.
 #' `f_60_that_deletion` measures bounded complement reduction under creer,
-#' pensar and esperar: infinitival or unmarked finite ccomp/xcomp clauses,
+#' pensar, esperar, decir, afirmar and asegurar (D-46): infinitival or unmarked finite ccomp/xcomp clauses,
 #' including clear coordination and auxiliary/copular clause-form projection.
 #' Overt introducers, interrogative complements and nominal infinitives are
 #' excluded. Each identified clause head contributes one occurrence, without
@@ -92,10 +101,11 @@
 #' tagged stream, including digit-final surface forms; spelled-out numerals
 #' remain words. Dictionary phrases are not compounded for this metric.
 #' Retained tokens determine the 200-token fallback threshold, rather than
-#' the normalization denominator `n_tokens`, which still includes number words.
+#' the normalization denominator, which still includes spelled-out numerals.
 #' One lexical-diversity measure is used throughout each supplied corpus.
 #' For MSTTR, `quanteda.textstats` may shorten the common segment length
-#' for short documents and issues a warning. Mean word length uses UD word tokens.
+#' for short documents and issues a warning. Mean word length (f_44) uses purely alphabetic UD word tokens, unrounded;
+#' documents without any receive `NA`.
 #' Documents with no retained diversity tokens receive `NA` for
 #' `f_43_type_token`, with a warning identifying those documents.
 #' Documents retain their order of first appearance.
@@ -107,7 +117,7 @@
 #' biber(udpipe_samples, measure = "TTR", normalize = FALSE)
 #' @export
 biber <- function(tokens, measure = c("MATTR", "TTR", "CTTR", "MSTTR", "none"),
-                  normalize = TRUE) {
+                  normalize = TRUE, feature_names = getOption("pseudobibeR.feature_names", "language")) {
   UseMethod("biber")
 }
 
@@ -115,34 +125,26 @@ biber <- function(tokens, measure = c("MATTR", "TTR", "CTTR", "MSTTR", "none"),
 #' @export
 biber.udpipe_connlu <- function(tokens,
                                measure = c("MATTR", "TTR", "CTTR", "MSTTR", "none"),
-                               normalize = TRUE) {
-  extract_spanish_features(tokens, match.arg(measure), normalize, "udpipe")
+                               normalize = TRUE,
+                               feature_names = getOption("pseudobibeR.feature_names", "language")) {
+  feature_names <- match_feature_names(feature_names)
+  out <- extract_spanish_features(tokens, match.arg(measure), normalize, "udpipe")
+  names(out) <- display_feature_names(names(out), feature_names)
+  out
 }
 
 #' @rdname biber
 #' @export
 biber.spacyr_parsed <- function(tokens,
                                measure = c("MATTR", "TTR", "CTTR", "MSTTR", "none"),
-                               normalize = TRUE) {
-  extract_spanish_features(tokens, match.arg(measure), normalize, "spacy")
+                               normalize = TRUE,
+                               feature_names = getOption("pseudobibeR.feature_names", "language")) {
+  feature_names <- match_feature_names(feature_names)
+  out <- extract_spanish_features(tokens, match.arg(measure), normalize, "spacy")
+  names(out) <- display_feature_names(names(out), feature_names)
+  out
 }
 
-#' @rdname biber
-#' @export
-biber.data.frame <- function(tokens,
-                            measure = c("MATTR", "TTR", "CTTR", "MSTTR", "none"),
-                            normalize = TRUE) {
-  engine <- if ("upos" %in% names(tokens)) "udpipe" else "spacy"
-  extract_spanish_features(tokens, match.arg(measure), normalize, engine)
-}
-
-#' @export
-biber.default <- function(tokens,
-                         measure = c("MATTR", "TTR", "CTTR", "MSTTR", "none"),
-                         normalize = TRUE) {
-  stop("'tokens' must be UDPipe annotations, spacyr annotations, or a data frame.",
-       call. = FALSE)
-}
 
 extract_spanish_features <- function(tokens, measure, normalize, engine, traced = FALSE) {
   if (!is.logical(normalize) || length(normalize) != 1L || is.na(normalize)) {

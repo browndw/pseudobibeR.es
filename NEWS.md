@@ -2,8 +2,15 @@
 
 ## Package interface
 
-- Added the common `biber()` and `audit_features()` S3 interfaces for UDPipe,
-  spaCy, and annotated data frames.
+- Output columns use language-specific display names from
+  `data-raw/feature_names.yaml` (D-54), e.g. `f_15_nominal_infinitives` for
+  the shared identifier `f_15_gerunds`. Each name keeps its `f_NN_` number,
+  which identifies the same feature in all three packages. Use
+  `feature_names = "shared"` in `biber()`/`audit_features()`, or
+  `options(pseudobibeR.feature_names = "shared")`, for the shared identifiers;
+  `audit_features(feature = )` accepts either name.
+- Added the common `biber()` and `audit_features()` S3 interfaces for UDPipe
+  and spaCy annotations.
 - Removed the Excel export API and archived Shiny applications outside the
   package project. `biber_es()`, `biber_es_batch()`, and `biber_es_traced()` are
   no longer public APIs. Use `biber()` for annotated corpora and
@@ -20,6 +27,66 @@
   tests do not download models.
 
 ## Corrections that change results
+
+- f_44 is the mean length of purely alphabetic words, unrounded, as in
+  English and French (D-51). Numerals (`2024`, `3,5`), hyphenated and
+  apostrophe forms no longer count, and values are no longer rounded to three
+  decimals. A document without alphabetic words gets `NA`.
+- f_63 no longer counts the analytic negator no as the only word between an
+  auxiliary or modal and its complement (`puede no venir`), as English does
+  not count "not" (D-49). Negative adverbs such as nunca still count, like
+  English "never".
+- f_60 also counts reduced complements of the public verbs decir, afirmar and
+  asegurar (`El testigo afirma haber visto al ladrón`), as Biber's
+  that-deletion counts public as well as private verbs (D-46). Suasive
+  `decir de` + infinitive and que-clauses are not counted.
+- f_15 also counts an infinitive heading a subject placed before its verb
+  (`Fumar perjudica`, `Leer es un placer`), the Spanish analogue of an English
+  gerund subject (D-43). Postposed subjects (`Es importante descansar`) remain
+  f_24, as do objects and prepositional infinitives; gerunds and participles
+  are not nominal in Spanish and are not counted.
+- f_23 now also counts *lo que* free relatives that are a verb's argument
+  (`Sé lo que hiciste`, `Me gusta lo que haces`), once per clause, as in
+  Biber's definition and the French *ce que/ce qui* counterpart. Their *que* is
+  no longer counted in f_21, and their *lo* is not an f_34 antecedent.
+  Sentence relatives after punctuation and free relatives governed by a copula
+  or preposition are excluded.
+- The output now contains `doc_id` and the feature columns only, as in the
+  English and French packages: `n_tokens` and `n_lex_tokens` were removed.
+- The normalization denominator now excludes digit-final numerals (`42`), as
+  in English; spelled-out numerals still count. It is the same word-token set
+  as the lexical-diversity stream.
+- `biber()` and `audit_features()` accept UDPipe and spacyr annotations only;
+  the plain data-frame and default methods were removed, as in English.
+
+- f_21 counts que complement clauses headed by a copular predicate
+  (`Creo que es una buena idea`, `Dijo que estaba cansado`), which were missed
+  because the clause head had to be a verb.
+- f_03 excludes conditional and imperative forms even when a model marks them
+  `Tense=Pres` (no change with Spanish-GSD).
+- Generated accent twins are now checked word by word within phrases, so a
+  phrase twin is not added when one of its words becomes a contrastive form
+  (no change to the current packaged data).
+- f_03 now counts finite present-tense verbs and auxiliaries in every mood,
+  including the present subjunctive, in parallel with f_01 and English
+  VBZ/VBP. Previously only the present indicative counted.
+- f_20 also counts perfect (`ha habido`) and infinitival (`puede haber`)
+  existential haber. Accent-insensitive matching now uses stringi
+  transliteration instead of platform-dependent `iconv()`.
+- Packaged word lists are read without YAML 1.1 boolean coercion. Previously
+  `no` in `neg_analytic_adverbs` was stored as `false` (no count changed,
+  because `negation_particles` already supplied `no`).
+- The data builder adds unaccented twins of accented inventory entries
+  (`aquí` -> `aqui`), except for contrastive grammatical words listed in
+  `accent_contrastive_forms` (`él`/`el`, `más`/`mas`, `qué`/`que`...) and
+  inflected forms where the accent is morphological. `ñ` is preserved.
+- Removed unused word lists (`verb_matchlist`, the subordinator inventories,
+  `coordinating_conjunctions`, `prepositions_simple`, `gerund_stoplist` and
+  `adverb_mente_stoplist`); `coordinating_conjunctions` had been stored as
+  deparsed strings. The f_11 dictionary key is now `f_11_indefinite_pronouns`,
+  matching its output column.
+- Corrected the public f_42 example: under the residual definition `Habla muy
+  rápidamente y siempre llega puntualmente.` has two adverbs, not four.
 
 - Activated f_61 for bounded resumptive prepositional relatives: nominal que
   relatives with finite predicate/subject evidence and linked third-person PP

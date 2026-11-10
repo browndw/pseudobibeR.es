@@ -21,7 +21,7 @@ make_es_tokens <- function(...) {
 }
 
 run_es <- function(tokens) {
-  biber(tokens, measure = "none", normalize = FALSE)
+  biber_fixture(tokens, measure = "none", normalize = FALSE)
 }
 
 # ─── f_52  Possibility modal ─────────────────────────────────────────────

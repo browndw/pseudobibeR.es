@@ -4,7 +4,6 @@
 \alias{audit_features}
 \alias{audit_features.udpipe_connlu}
 \alias{audit_features.spacyr_parsed}
-\alias{audit_features.data.frame}
 \title{Audit feature occurrences in annotated Spanish text}
 \usage{
 audit_features(
@@ -14,7 +13,8 @@ audit_features(
   sample_n = NULL,
   seed = NULL,
   max_per_doc = NULL,
-  window = 5
+  window = 5,
+  feature_names = getOption("pseudobibeR.feature_names", "language")
 )
 
 \method{audit_features}{udpipe_connlu}(
@@ -24,7 +24,8 @@ audit_features(
   sample_n = NULL,
   seed = NULL,
   max_per_doc = NULL,
-  window = 5
+  window = 5,
+  feature_names = getOption("pseudobibeR.feature_names", "language")
 )
 
 \method{audit_features}{spacyr_parsed}(
@@ -34,23 +35,15 @@ audit_features(
   sample_n = NULL,
   seed = NULL,
   max_per_doc = NULL,
-  window = 5
-)
-
-\method{audit_features}{data.frame}(
-  tokens,
-  feature = NULL,
-  category = NULL,
-  sample_n = NULL,
-  seed = NULL,
-  max_per_doc = NULL,
-  window = 5
+  window = 5,
+  feature_names = getOption("pseudobibeR.feature_names", "language")
 )
 }
 \arguments{
 \item{tokens}{Annotated tokens, as accepted by \code{\link[=biber]{biber()}}.}
 
-\item{feature}{One or more canonical feature identifiers.}
+\item{feature}{One or more feature names: display names (see
+\link{feature_names}) or shared identifiers.}
 
 \item{category}{A category letter (\code{"A"} through \code{"P"}) or its label in
 \code{.feature_categories}. Supply exactly one of \code{feature} and \code{category}.}
@@ -63,6 +56,10 @@ state is restored after sampling.}
 \item{max_per_doc}{Optional positive integer limiting rows per document.}
 
 \item{window}{Non-negative integer number of context tokens on each side.}
+
+\item{feature_names}{\code{"language"} (default) to report features with the
+Spanish display names in \link{feature_names}, or \code{"shared"} for the identifiers
+shared by the companion packages. \code{feature} accepts either name.}
 }
 \value{
 An \code{audit_features_result} tibble with the French companion's

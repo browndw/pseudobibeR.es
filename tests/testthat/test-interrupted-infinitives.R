@@ -19,11 +19,11 @@ test_that("f62 counts a preposition interrupted by genuine adverbs once per infi
     dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats"),
     class = c("spacyr_parsed", "data.frame")
   ))) {
-    raw <- biber(input, measure = "none", normalize = FALSE)
+    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
     expect_equal(raw$f_62_split_infinitive, rep(1, 4))
     expect_equal(raw$f_24_infinitives, rep(1, 4))
-    expect_equal(biber(input, measure = "none")$f_62_split_infinitive, 1000 / c(3, 4, 6, 4))
-    audit <- audit_features(input, feature = "f_62_split_infinitive", window = 0)
+    expect_equal(biber_fixture(input, measure = "none")$f_62_split_infinitive, 1000 / c(3, 4, 6, 4))
+    audit <- audit_fixture(input, feature = "f_62_split_infinitive", window = 0)
     expect_equal(audit$keyword, c("de realmente comprender", "de muy bien comprender",
                                 "de quiza realmente muy lentamente comprender",
                                 "de no realmente comprender"))
@@ -37,7 +37,7 @@ test_that("negation-only interruptions are excluded regardless of ADV/PART taggi
   inputs <- lapply(words, function(word) interrupted_infinitive(word, word))
   inputs[[length(inputs) + 1L]] <- interrupted_infinitive("particle", "no", "PART")
   inputs[[length(inputs) + 1L]] <- interrupted_infinitive("two", c("no", "nunca"))
-  raw <- biber(do.call(rbind, inputs), measure = "none", normalize = FALSE)
+  raw <- biber_fixture(do.call(rbind, inputs), measure = "none", normalize = FALSE)
   expect_equal(raw$f_62_split_infinitive, rep(0, length(inputs)))
 })
 
@@ -51,14 +51,14 @@ test_that("prepositions must introduce the infinitive, directly or through an in
   wrong$doc_id <- "wrong_link"
   wrong$head_token_id[2] <- "0"
   tokens <- rbind(direct, indirect, wrong)
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive,
                c(1, 1, 0))
   chain <- interrupted_infinitive("chain", c("muy", "lentamente"))
   chain$head_token_id[1:3] <- c("2", "3", "4")
   chain$dep_rel[1] <- "case"
-  expect_equal(biber(chain, measure = "none", normalize = FALSE)$f_62_split_infinitive, 1)
+  expect_equal(biber_fixture(chain, measure = "none", normalize = FALSE)$f_62_split_infinitive, 1)
   chain$head_token_id[2] <- "2"
-  expect_equal(biber(chain, measure = "none", normalize = FALSE)$f_62_split_infinitive, 0)
+  expect_equal(biber_fixture(chain, measure = "none", normalize = FALSE)$f_62_split_infinitive, 0)
 })
 
 test_that("compound/copular infinitives and fixed introductory markers retain full matched spans", {
@@ -81,9 +81,9 @@ test_that("compound/copular infinitives and fixed introductory markers retain fu
     c(NA, NA, NA, "VerbForm=Inf")
   )
   tokens <- rbind(compound, copula, fixed)
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive,
                c(1, 1, 1))
-  expect_equal(audit_features(tokens, feature = "f_62_split_infinitive", window = 0)$keyword,
+  expect_equal(audit_fixture(tokens, feature = "f_62_split_infinitive", window = 0)$keyword,
                c("de realmente haber", "de realmente estar", "a finalmente resolver"))
 })
 
@@ -96,7 +96,7 @@ test_that("known adverb mistaggings use bounded lookup without retagging input",
   even$token[1:2] <- even$lemma[1:2] <- c("sin", "siquiera")
   even$upos[2] <- even$xpos[2] <- "NOUN"
   original <- rbind(better, even)
-  expect_equal(biber(original, measure = "none", normalize = FALSE)$f_62_split_infinitive,
+  expect_equal(biber_fixture(original, measure = "none", normalize = FALSE)$f_62_split_infinitive,
                c(1, 1))
   expect_identical(original$upos, c("ADP", "ADJ", "VERB", "ADP", "NOUN", "VERB"))
 })
@@ -115,7 +115,7 @@ test_that("ordinary infinitives, subjects, punctuation and nominal infinitives a
     c(NA, NA, "PronType=Art", "VerbForm=Inf")
   )
   tokens <- rbind(plain, no_prep, subject, punctuation, finite, nominal)
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive,
                rep(0, 6))
 })
 
@@ -123,13 +123,13 @@ test_that("split spans honor document/sentence boundaries and noncontiguous toke
   tokens <- interrupted_infinitive("ids")
   tokens$token_id <- c("10", "25", "40")
   tokens$head_token_id <- c("40", "40", "0")
-  expect_equal(audit_features(tokens, feature = "f_62_split_infinitive", window = 0)$keyword,
+  expect_equal(audit_fixture(tokens, feature = "f_62_split_infinitive", window = 0)$keyword,
                "de realmente comprender")
   tokens$sentence_id[3] <- 2L
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive, 0)
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive, 0)
   tokens$sentence_id <- 1L
   tokens$doc_id[3] <- "other"
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive,
                c(0, 0))
 })
 
@@ -161,11 +161,11 @@ expect_interrupted_infinitive_baseline <- function(tokens, para, multiple) {
   expect_equal(traced$counts$f_62_split_infinitive, expected)
   evidence <- traced$evidence[traced$evidence$feature == "f_62_split_infinitive", ]
   expect_equal(anyDuplicated(evidence[c("doc_id", "sentence_id", "token_id")]), 0L)
-  audit <- audit_features(tokens, feature = "f_62_split_infinitive", window = 0)
+  audit <- audit_fixture(tokens, feature = "f_62_split_infinitive", window = 0)
   expect_equal(tabulate(match(audit$doc_id, traced$counts$doc_id), nbins = 15), expected)
   expect_equal(audit$keyword, evidence$token)
-  expect_equal(biber(tokens, measure = "TTR")$f_62_split_infinitive,
-               1000 * expected / traced$counts$n_tokens)
+  expect_equal(biber_fixture(tokens, measure = "TTR")$f_62_split_infinitive,
+               1000 * expected / word_tokens(tokens))
   expect_identical(tokens, original)
 }
 
@@ -205,6 +205,6 @@ test_that("shipped examples include genuine interruptions and exclude negation-o
   tokens <- udpipe::udpipe_annotate(
     .fc_ud(), x = examples$example, doc_id = paste0("example_", seq_len(nrow(examples)))
   )
-  expect_equal(biber(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive,
+  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive,
                examples$count)
 })

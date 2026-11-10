@@ -14,10 +14,11 @@ as the English and French companion packages.
 \code{\link[=biber]{biber()}}, \code{\link[=audit_features]{audit_features()}}
 }
 \author{
-\strong{Maintainer}: Maximiliano Cordovez \email{maximiliano.cf@outlook.es}
+\strong{Maintainer}: David Brown \email{dwb2@andrew.cmu.edu} (\href{https://orcid.org/0000-0001-7745-6354}{ORCID})
 
 Authors:
 \itemize{
+  \item David Brown \email{dwb2@andrew.cmu.edu} (\href{https://orcid.org/0000-0001-7745-6354}{ORCID})
   \item Maximiliano Cordovez \email{maximiliano.cf@outlook.es}
 }
 

@@ -11,11 +11,12 @@
 # la precisión del conteo. Se asume modelo UDPipe spanish-gsd.
 #
 # NOTAS:
-#  - f_01 (pretérito indefinido): verbos con Tense=Past, Mood=Ind, VerbForm=Fin
-#    Ej.: llegó, presentaron, fue (indefinido).
-#  - f_28: rasgo
-#    zero-output (cicatrices de paridad superficial con pseudobibeR.fr);
-#    no se evalúan aquí porque siempre devuelven 0.
+#  - f_01 (pasado): VERB/AUX finitos con Tense=Past/Imp/Pqp, en cualquier modo.
+#    Ej.: llegó, presentaron, corría, corriera.
+#  - f_03 (presente): VERB/AUX finitos con Tense=Pres, en cualquier modo
+#    (incluye el presente de subjuntivo).
+#  - f_28: cero de compatibilidad (el español estándar no tiene gerundio
+#    postnominal productivo con valor de relativa reducida); no se evalúa aquí.
 #  - f_69_mente_adverbs y f_71_preterit ELIMINADOS del corpus (no son rasgos
 #    del catálogo Biber 67; eran extensiones internas retiradas del output).
 #  - f_43 (TTR) y f_44 (longitud media) dependen del texto completo;
@@ -29,7 +30,7 @@
 # TIEMPO VERBAL
 # ────────────────────────────────────────────────────────────────────────────��
 
-# f_01 = pretérito indefinido (Tense=Past, Mood=Ind, VerbForm=Fin)
+# f_01 = pasado finito (Tense=Past/Imp/Pqp, VerbForm=Fin)
 - feature: f_01_past_tense
   example: "María llegó tarde a la reunión."
   count: 1.0
@@ -52,6 +53,11 @@
 
 - feature: f_03_present_tense
   example: "Los datos muestran que el modelo funciona bien."
+  count: 2.0
+
+# El presente de subjuntivo también cuenta (venga).
+- feature: f_03_present_tense
+  example: "Espero que venga mañana."
   count: 2.0
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -149,6 +155,10 @@
   example: "Hay tres errores en el documento."
   count: 1.0
 
+- feature: f_20_existential_there
+  example: "Ha habido muchos problemas."
+  count: 1.0
+
 # ─────────────────────────────────────────────────────────────────────────────
 # COMPLEMENTIZADORES Y SUBORDINACIÓN
 # ─────────────────────────────────────────────────────────────────────────────
@@ -240,6 +250,18 @@
 
 - feature: f_60_that_deletion
   example: "Puedo ir."
+  count: 0.0
+
+- feature: f_60_that_deletion
+  example: "El testigo afirma haber visto al ladrón."
+  count: 1.0
+
+- feature: f_60_that_deletion
+  example: "Ella asegura conocerlo."
+  count: 1.0
+
+- feature: f_60_that_deletion
+  example: "Me dijo de ir."
   count: 0.0
 
 # f_61: relativas preposicionales reasuntivas; no pied-piping ni PP independiente
@@ -342,11 +364,10 @@
   count: 2.0
 
 - feature: f_42_adverbs
-  # REVISION HERNAN (Fase 1): f_42 = "Total adverbs". Cuenta TODOS los ADV, con
-  # solapamientos deliberados: muy (tb. f_48), siempre (tb. f_05), rápidamente,
-  # puntualmente = 4. Antes se restaban f_05/f_48 y daba 2.
+  # D-15: f_42 is residual. muy (f_48) and siempre (f_05) are excluded;
+  # rápidamente and puntualmente remain = 2.
   example: "Habla muy rápidamente y siempre llega puntualmente."
-  count: 4.0
+  count: 2.0
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MARCADORES DE POSICIÓN (STANCE)
@@ -490,13 +511,18 @@
 # COMPLEJIDAD LÉXICA
 # ─────────────────────────────────────────────────────────────────────────────
 
-# f_15: infinitivos claramente sustantivados, no todas las clausulas de infinitivo
+# f_15: infinitivos en función nominal: sustantivados (el saber) o sujeto
+# antepuesto (Fumar perjudica); el sujeto pospuesto sigue siendo f_24.
 - feature: f_15_gerunds
   example: "El saber es valioso."
   count: 1.0
 
 - feature: f_15_gerunds
   example: "Fumar perjudica la salud."
+  count: 1.0
+
+- feature: f_15_gerunds
+  example: "Es importante descansar."
   count: 0.0
 
 # f_14: nominalizaciones derivadas
