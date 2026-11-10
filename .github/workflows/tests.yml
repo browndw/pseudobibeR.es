@@ -30,7 +30,6 @@ jobs:
           udpipe::udpipe_download_model(language = 'spanish-gsd', model_dir = 'tests/models')
           "
 
-      - uses: actions/setup-python@v6
       - name: Run Tests
         run: |
           devtools::test(stop_on_failure = TRUE, stop_on_warning = TRUE)
