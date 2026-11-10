@@ -23,7 +23,7 @@ jobs:
           extra-packages: any::testthat, any::devtools
           needs: check
 
-      - name: Download UDPipe French model for tests
+      - name: Download UDPipe Spanish model for tests
         run: |
           Rscript -e "
           if (!dir.exists('tests/models')) dir.create('tests/models', recursive = TRUE)

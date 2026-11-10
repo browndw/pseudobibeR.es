@@ -107,7 +107,8 @@ test_that("emphatic, conjunct, discourse, and negative adverbs are not extra exc
   raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_49_emphatics, 1)
   expect_equal(raw$f_45_conjuncts, 1)
-  expect_gte(raw$f_50_discourse_particles, 2)
+  # Mid-clause particles are not f_50 (D-56); f_42 still keeps the adverbs.
+  expect_equal(raw$f_50_discourse_particles, 0)
   expect_equal(raw$f_67_neg_analytic, 1)
   expect_equal(raw$f_42_adverbs, 4)
   expect_equal(audit_fixture(tokens, feature = "f_42_adverbs")$keyword,
