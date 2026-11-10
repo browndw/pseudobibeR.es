@@ -72,6 +72,8 @@ check_installed_resource_isolation <- function(case) {
     args <- commandArgs(trailingOnly = TRUE)
     .libPaths(c(args[-1L], .libPaths()))
     case <- readRDS(args[1L])
+    # Expected values use the shared identifiers, as set in the test helper.
+    options(pseudobibeR.feature_names = "shared")
     check <- function() {
       for (name in names(case$inputs)) {
         input <- case$inputs[[name]]
