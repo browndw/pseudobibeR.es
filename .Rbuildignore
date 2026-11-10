@@ -13,3 +13,4 @@
 ^tests/models$
 ^tests/testthat/fixtures/.*\.udpipe$
 ^LICENSE\.md$
+^FEATURES_TECHNICAL\.md$
