@@ -14,6 +14,10 @@ The sample sentences are original examples included in the script. UDPipe
 samples preserve the native annotation class. Do not label converted UDPipe
 annotations as spaCy output.
 
+`feature_names.yaml` holds the Spanish display names of output columns
+(shared identifier: display name); each display name must keep its `f_NN_`
+number. Rebuild it with `source("data-raw/build_feature_names.R")`.
+
 Rebuild after changing lexical resources, then run `devtools::document()`,
 `testthat::test_local()`, and `devtools::check()`. Changes to expected
 linguistic counts must be reviewed independently of the extractor's output.

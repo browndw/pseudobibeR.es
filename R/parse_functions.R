@@ -87,6 +87,7 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
   evidence <- evidence[evidence$feature %in% .evidence_features, ]
 
   lexical <- dictionary_evidence(tokens, c(.dual_path_features, .dict_only_features))
+  lexical$evidence <- clause_initial_particles(lexical$evidence, tokens)
   for (feature in .dual_path_features) {
     spans <- lexical$spans[lexical$spans$feature == feature, ]
     for (i in seq_len(nrow(spans))) {

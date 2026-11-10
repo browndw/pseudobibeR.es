@@ -28,6 +28,14 @@
 
 ## Corrections that change results
 
+- f_50 counts discourse particles only at the start of a clause
+  (sentence-initial or after punctuation), as Biber and the English package do
+  (D-56): adjectival *claro* (*está claro*) and mid-clause *pues* or *mira* no
+  longer count.
+- Dictionary phrases containing *al* or *del* never matched UDPipe output,
+  which splits them (*al lado* → *a el lado*). Both forms now match, so
+  *al lado de*, *al norte*, *al final*, *del mismo modo*, *al fin y al cabo*
+  and similar entries are counted (D-55).
 - f_44 is the mean length of purely alphabetic words, unrounded, as in
   English and French (D-51). Numerals (`2024`, `3,5`), hyphenated and
   apostrophe forms no longer count, and values are no longer rounded to three

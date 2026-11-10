@@ -5,8 +5,7 @@ linguistic review of the package. It describes the **actual behavior** of the
 extractor on the UDPipe `spanish-gsd` model, not only the theoretical intent.
 
 The **Label** column is English; the **Spanish label** column keeps the original
-Spanish name. Decision IDs (D-NN) refer to `CROSS_LANGUAGE_ALIGNMENT.md` in the
-family repository. For a user-oriented overview, see the README.
+Spanish name. Decision IDs (D-NN) refer to [`CROSS_LANGUAGE_ALIGNMENT.md`](https://github.com/browndw/pseudobibeR/blob/main/CROSS_LANGUAGE_ALIGNMENT.md). For a user-oriented overview, see the README.
 
 ## Feature names
 
@@ -37,7 +36,10 @@ family repository. For a user-oriented overview, see the README.
    excluding punctuation, symbols, spaces, digit-final numerals (`42`), and
    multiword-token container rows, as in the English and French packages.
    The output contains `doc_id` and the feature columns only.
-4. Parser-sensitive distinctions require independent linguistic validation.
+4. Dictionary phrases match both the contracted article (`al`, `del`, as
+   spaCy tokenizes it) and UDPipe's split words (`a el`, `de el`), so
+   `al lado de` and `del mismo modo` are found with either parser (D-55).
+5. Parser-sensitive distinctions require independent linguistic validation.
    Known `spanish-gsd` limitations are documented below (marked ⚠️).
 
 ---
@@ -151,7 +153,7 @@ word has the intended discourse, degree, or epistemic function.
 | `f_47_hedges` | Epistemic hedges expressing approximation, vagueness or reservation | Modalizadores epistémicos que corresponden a expresiones de aproximación, imprecisión o reserva | `quizás`, `tal vez`, `probablemente`, `más o menos`, `una especie de`, **`casi`** (for consistency with *almost*). | — |
 | `f_48_amplifiers` | Degree intensifiers | Intensificadores de grado | `muy`, `totalmente`, `absolutamente`… | — |
 | `f_49_emphatics` | Emphatic or assertion-reinforcing expressions | Expresiones de énfasis o refuerzo asertivo | `de hecho`, `sin duda`, `realmente`… | — |
-| `f_50_discourse_particles` | Conversational discourse particles | Partículas discursivas conversacionales | Surface dictionary (`bueno`, `pues`, `claro`, `mira`…). | ⚠️ **No reliable positional filter:** `spanish-gsd` does not mark `discourse` and mis-tags the ambiguous forms (`Bueno`→ADJ, `Mira`→PROPN, `Claro`→PROPN). It counts some false positives (allowed by the base specification). |
+| `f_50_discourse_particles` | Conversational discourse particles | Partículas discursivas conversacionales | Surface dictionary (`bueno`, `pues`, `claro`, `mira`…), kept only clause-initially: the match starts the sentence or follows punctuation (D-56), as in Biber and English. *Bueno, vamos.*; *Pues no lo sé.* | Adjectival *claro* (*está claro*), causal *pues* mid-clause and verbal *mira* mid-clause are not counted. A sentence-initial imperative (*Mira la televisión*) still counts; position is the only signal, as in English. |
 | `f_51_demonstratives` | Demonstrative determiners before a noun | Determinantes demostrativos antepuestos a un sustantivo | `este/ese/aquel` + noun. | Not to be confused with f_10 (pronominal use). |
 
 ## L. Modals (periphrases)
@@ -245,8 +247,8 @@ They are not forced (project methodology):
 - **Polysemous verbs** (f_55/f_57): `sostuvo` is mis-tagged as ADJ; disambiguating
   `decir` by mood was not implemented. `recomendar` (f_57) has a confirmed
   lemmatization limit in its diphthongized forms (see f_57).
-- **Ambiguous discourse particles** (f_50): no `discourse` signal; the positional
-  filter is not reliable (`Bueno`→ADJ, `Mira`→PROPN).
+- **Ambiguous discourse particles** (f_50): position is the only filter
+  (clause-initial, D-56); a sentence-initial imperative *mira* still counts.
 - **Encoding**: the accented phrases of f_39 need a UTF-8 locale; source-code literals
   use `\uXXXX` escapes instead of accented characters to avoid corruption when the
   package is loaded under non-UTF-8 locales (e.g. `LC_CTYPE=C`).

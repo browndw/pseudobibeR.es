@@ -669,7 +669,7 @@ block_clause_embedding_es <- function(tokens, doc_ids, head_lookup,
   # is always a VERB and so distinguishes nothing). Without this second level, f_21
   # absorbed ALL the adjectival cases (verified: "Es importante que
   # vengas" -> it used to count in f_21, never in f_22) and f_22 always stayed
-  # at 0. See TABLA_RASGOS_ES.md §f_21/f_22.
+  # at 0. See FEATURES_TECHNICAL.md, f_21/f_22.
   grandparent_lookup <- tokens %>%
     dplyr::transmute(
       .data$doc_id, .data$sentence_id,

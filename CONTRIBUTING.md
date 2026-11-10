@@ -17,7 +17,7 @@ shows exactly which words were counted.
 
 Proposals to change what a feature counts are welcome. Please explain the
 linguistic reasoning; accepted changes are recorded in the family decision
-log (`CROSS_LANGUAGE_ALIGNMENT.md`) so that the three packages stay parallel.
+log ([`CROSS_LANGUAGE_ALIGNMENT.md`](https://github.com/browndw/pseudobibeR/blob/main/CROSS_LANGUAGE_ALIGNMENT.md)) so that the three packages stay parallel.
 
 ## Package layout
 

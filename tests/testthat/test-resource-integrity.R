@@ -38,3 +38,25 @@ test_that("unaccented input matches lexical inventories but not contrastive word
   expect_equal(raw$f_47_hedges, 1)
   expect_equal(raw$f_04_place_adverbials, 1)
 })
+
+test_that("dictionary phrases with al/del match UDPipe's split contractions (D-55)", {
+  parsed <- as.data.frame(udpipe::udpipe_annotate(
+    .fc_ud(),
+    x = c("Vive al lado de la iglesia.", "Viven al norte.", "Lo hizo del mismo modo."),
+    doc_id = c("lado", "norte", "modo")
+  ))
+  raw <- biber_fixture(parsed, measure = "none", normalize = FALSE)
+  expect_equal(raw$f_04_place_adverbials, c(1, 1, 0))
+  expect_equal(raw$f_45_conjuncts, c(0, 0, 1))
+})
+
+test_that("f_50 counts discourse particles only clause-initially (D-56)", {
+  parsed <- as.data.frame(udpipe::udpipe_annotate(
+    .fc_ud(),
+    x = c("Pues no lo s\u00e9.", "Lo hizo pues ten\u00eda tiempo.", "Est\u00e1 claro el problema.",
+          "Claro que s\u00ed."),
+    doc_id = c("pues_initial", "pues_medial", "claro_adj", "claro_initial")
+  ))
+  raw <- biber_fixture(parsed, measure = "none", normalize = FALSE)
+  expect_equal(raw$f_50_discourse_particles, c(1, 0, 0, 1))
+})

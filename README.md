@@ -217,7 +217,7 @@ the examples marks what is counted.
 | `f_47_hedges` | Hedges (mark uncertainty) | Marcadores de duda o imprecisión | ***Quizás** dependa de otros factores.* |
 | `f_48_amplifiers` | Amplifiers (strengthen a statement) | Intensificadores | *una diferencia **muy** significativa* |
 | `f_49_emphatics` | Emphatics | Enfáticos | ***De hecho**, los resultados lo confirman.* |
-| `f_50_discourse_particles` | Discourse markers | Marcadores discursivos | ***Bueno**, **pues** vamos.* |
+| `f_50_discourse_particles` | Discourse markers at the start of a clause | Marcadores discursivos al inicio de cláusula | ***Bueno**, **pues** vamos.* |
 | `f_51_demonstratives` | Demonstratives before a noun | Determinantes demostrativos | ***este** libro* |
 | **L. Modals** | | | |
 | `f_52_modal_possibility` | Possibility (*poder*) | Posibilidad (*poder*) | ***Podemos** mejorar los resultados.* |
