@@ -1,8 +1,8 @@
 ---
-title: "Spanish feature extraction and auditing"
+title: "Counting Biber's features in Spanish texts"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Spanish feature extraction and auditing}
+  %\VignetteIndexEntry{Counting Biber's features in Spanish texts}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -11,169 +11,110 @@ vignette: >
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
-## A common interface
+This vignette walks through a typical analysis: preparing texts, counting
+features, checking what was counted and comparing results with the English
+and French packages. The examples use the annotated sample documents shipped
+with the package, so they run without downloading a parser model.
 
-Parsing is separate from feature extraction. The packaged annotations let this
-example run without a model download or a new annotation run. Reading native
-UDPipe annotations requires the suggested `udpipe` package.
+## From texts to features
+
+`biber()` works on parsed text. A typical pipeline reads the texts, normalizes
+typographic quotes, builds a corpus and parses it with udpipe or spaCy:
+
+```{r, eval=FALSE}
+library(readtext)
+library(quanteda)
+library(udpipe)
+library(pseudobibeR.es)
+
+docs <- readtext("corpus/*.txt", encoding = "UTF-8")
+docs$text <- utf8::utf8_normalize(docs$text, map_quote = TRUE)
+corp <- corpus(docs)
+
+model <- udpipe_download_model(language = "spanish-gsd")
+ud_model <- udpipe_load_model(model$file_model)
+parsed <- udpipe_annotate(ud_model, x = as.character(corp), doc_id = docnames(corp))
+
+features <- biber(parsed)
+```
+
+With spaCy, request morphology, which `biber()` needs:
+
+```{r, eval=FALSE}
+spacyr::spacy_initialize(model = "es_core_news_sm")
+parsed <- spacyr::spacy_parse(corp, pos = TRUE, tag = TRUE, dependency = TRUE,
+                              entity = FALSE, additional_attributes = "morph")
+features <- biber(parsed)
+spacyr::spacy_finalize()
+```
+
+## Reading the output
+
+The sample documents are three short Spanish texts annotated with udpipe:
 
 ```{r}
 library(pseudobibeR.es)
 features <- biber(udpipe_samples, measure = "TTR", normalize = FALSE)
-features[, c("doc_id", "f_01_past_tense", "f_18_by_passives")]
-audit_features(udpipe_samples, feature = "f_18_by_passives")
+features[, c("doc_id", "f_01_past_tense", "f_17_agentless_passives",
+             "f_18_agent_passives", "f_21_que_verb_comp")]
 ```
 
-## Corpus processing
+Each row is a document and each column a feature. With `normalize = FALSE`
+the values are raw counts. The default, `normalize = TRUE`, gives rates per
+1,000 words, which is what you want when documents differ in length. Words
+exclude punctuation, symbols and numbers written in digits. Two columns are
+measures rather than counts and are never normalized: f_43, the type/token
+ratio, and f_44, the mean word length.
 
-Give each document a unique identifier when annotating. Pass the entire annotated
-corpus to `biber()`; one output row is returned per document. UDPipe and spaCy
-annotations use the same public interface. Parsing and export remain the
-responsibility of the caller.
+## Checking what was counted
 
-For spaCy, initialize an installed Spanish model in your chosen Python
-environment (for example `r-spacyr`). The following is not run when building
-the vignette, because Python and its model are external prerequisites:
+`audit_features()` lists every occurrence behind a count, with its context.
+Use it to check surprising values or to see what a feature captures:
 
-```{r, eval=FALSE}
-reticulate::use_condaenv("r-spacyr", required = TRUE)
-spacyr::spacy_initialize(model = "es_core_news_sm")
-parsed <- spacyr::spacy_parse(
-  c(doc_1 = "Yo he terminado el informe.", doc_2 = "No vino nadie."),
-  dependency = TRUE, tag = TRUE, pos = TRUE, entity = FALSE,
-  additional_attributes = "morph"
-)
-biber(parsed, measure = "TTR", normalize = FALSE)
-audit_features(parsed, feature = "f_02_perfect_aspect")
-spacyr::spacy_finalize()
+```{r}
+audit_features(udpipe_samples, feature = "f_18_agent_passives")
 ```
 
-Morphology must be explicitly requested; the default `spacy_parse()` output
-does not supply it. Both native Python morphology objects and serialized
-morphology strings are accepted. Optional live tests and frozen annotations
-exercise the Spanish spaCy model, but do not establish corpus-level accuracy.
-
-## Interpretation
-
-`normalize = TRUE` divides counts by the document's number of word tokens and
-multiplies by 1,000. Function words and spelled-out numerals count in that
-denominator; punctuation, symbols, spaces, digit-final numerals (`42`) and UD
-multiword-token containers do not, as in the English and French packages. The
-two lexical metrics are not normalized.
-Tokenization remains parser-specific: a contraction or enclitic retained as
-one spaCy token counts once, whereas supplied UD component words count
-separately. The extractor does not infer a missing decomposition.
-
-The usual output has 67 feature columns. `measure = "none"` omits lexical
-diversity. Its types are lower-case surface forms with parser tags appended,
-not lemmas. Fine-grained tags are retained; missing or `_` tags use UPOS.
-Punctuation, symbols, and spaces are excluded by UD POS, and the English
-numeric pattern `\d_` removes numeric matches from the tagged stream.
-Spelled-out numerals remain words; dictionary expressions are not compounded.
-
-MATTR is the default; if any document has fewer than 200 retained diversity
-tokens, the whole supplied corpus uses TTR, with one message. The threshold
-population uses the same word tokens as the normalization denominator.
-Thus, each document's value is calculated using the same selected measure.
-Explicitly selected TTR, CTTR, and MSTTR are retained throughout the corpus.
-For MSTTR, `quanteda.textstats` may shorten its common segment length and warns.
-Supply the complete corpus together rather than processing documents
-independently when relying on automatic fallback. For multivariate analysis,
-use the same measure across all compared corpora before scaling.
-Documents with no retained diversity tokens receive `NA` for f_43 and an
-identifying warning, rather than a fabricated score.
-
-f_28 is zero by compatibility convention, not a measured absence. Standard
-Spanish has no productive postnominal gerund functioning as a reduced relative;
-that function is expressed by full relative clauses (f_29-f_32).
-`f_59_contractions` counts a bounded inventory of colloquial written reductions,
-not ordinary `al/del` or every apostrophe. Surface/span lookup supports `pa`
-forms, `onde/nde/onde's/ontas` and reduced `estar` forms despite inconsistent
-native tags and lemmas. Each longest recognized expression counts once:
-`Ontas? Ven pa’ca’rriba` gives two occurrences. Nominal determiner contexts
-and short nominal acronyms are excluded. Supplied annotations and word-token
-populations are unchanged, so model-dependent apostrophe/fragment tags can
-still affect normalization.
-
-`f_60_that_deletion` is a functional complement-reduction analogue, not only
-literal `que` omission. Under the initial creer/pensar/esperar inventory,
-infinitival complements (`Pienso ir`, `Creo haber entendido`) and unmarked
-finite complements (`Nosotros esperamos lleguen mañana`) count once per
-identified clause head. Clear coordinated complements and auxiliary/copular
-forms are supported; overt introducers, indirect questions and nominal
-infinitives are excluded. `Puedo ir` is not a qualifying lexical complement.
-Overlap with f_24 is intentional: infinitive form and complement-reduction
-function are different dimensions. This neither reconstructs deletion nor
-establishes identical meanings/registers across languages. Supplied annotations
-and denominators remain unchanged, and missed predicate/complement analyses
-can produce zeros.
-
-`f_62_split_infinitive` measures an adverb interrupting a linked
-preposition–verbal-infinitive unit: `Trato de realmente comprender` qualifies,
-but `Trato de comprender realmente` does not. Each full matched span counts
-once, anchored at the preposition. Consecutive adverbs are supported; subjects,
-punctuation and nominal infinitives are excluded. A non-negative adverb is
-required: `para no volver` is excluded, but `para no realmente volver` qualifies.
-This intentionally differs from negation-inclusive companion heuristics.
-Bounded mejor/siquiera lookup and linked auxiliary/copular forms are supported
-without rewriting supplied annotations. Missing marker/adverb attachments can
-produce zeros; proximity alone is insufficient. f_24 and legitimate f_63
-overlap remain independent.
-
-`f_61_stranded_preposition` measures the Spanish resumptive counterpart of
-English stranding: `el chico que hablé de él`, competing with pied-piping
-`el chico del que hablé`. Initial hablar-de/depender-de/confiar-en frames
-require a finite nominal que relative, first/second-person or separate-subject
-evidence, and a postverbal linked él/ella/ellos/ellas PP with no known agreement
-conflict or bare direct object. `el chico que habló de él` and ordinary object
-relatives with unrelated PPs do not qualify. One relative construction counts
-once, with its first matching PP span in audits. Detected markers leave the
-f_29/f_30 gap bins; pied-piping and other relative bins are unchanged.
-Unambiguous hablé/confié lookup handles known native errors without rewriting
-annotations. Other frames, gender/coreference ambiguities and model errors
-remain outside this bounded baseline. French's f_61 review is recorded but
-no companion detector is changed here.
-Nominal relatives are partitioned by marker family and role: `que` subject/object
-in f_29/f_30, and `quien/cual` forms in f_31/f_32. An article before `que`
-does not change its marker family. Pied-piping f_33 takes exclusive precedence;
-free relatives, indirect questions and sentential relatives are separate scopes.
-Bounded subject-conflict/agreement checks and relative-morphology-based native
-attachment recovery do not rewrite input annotations. Roleless `que` needs
-positive intransitive/locative predicate evidence or an external subject,
-not just absence of another subject. Unresolved gaps can produce zero despite
-a genuine relative clause, so parser-based totals are not exhaustive.
-The family bins are language-sensitive; pooling f_29+f_31 and f_30+f_32 gives
-detected non-pied-piping subject/object relatives, not all relative clauses.
-`f_15_gerunds` counts clear noun-like nominal infinitives, such as `el saber`
-or `el buen comer`, with nominal internal structure and verified infinitive/verb
-identity. Articles alone or bare infinitival subjects are not sufficient.
-Qualifying words are excluded from f_14/f_16 noun counts and f_24 verbal
-infinitives by occurrence identity; the same shared selection prevents nominal
-subjects from licensing impersonal f_09. Noun-tagged forms without infinitive
-morphology need a known verb identity, not merely an `-ar/-er/-ir` ending.
-Source annotations, word-token populations and lexical metrics are unchanged.
-`f_12_proverb_do` counts lexical anaphoric `hacer` with action-proform `lo`
-(including enclitics) or `lo mismo`, once on the supplied verb word.
-Auxiliary/copular, causative, identifiable reflexive and overt nominal-object
-uses are excluded; pronoun/noun counts remain independent of pro-verb counts. Bare `lo hizo`
-is a structural candidate, not semantic resolution of a distant antecedent.
-`f_09_pronoun_it` counts identified impersonal predicates, not null
-pronouns: `Llueve`, `Es importante descansar`, and `Parece que vendrá` each
-contribute one occurrence on the existing predicate word. Weather and selected
-impersonal clausal rules reject overt nominal subjects and generic personal
-pro-drop. Existential `haber` remains in f_20; ambiguous `se` and neuter `lo`
-are outside this baseline. Supplied word-token denominators are unchanged;
-UD empty nodes are not counted.
-Language-specific constructions, parser errors, and lexical inventories mean
-that identical column names do not guarantee cross-language equivalence.
-Do not interpret scores against English factor norms as validated Spanish scores.
-
-## Auditing
-
-Use a canonical feature identifier or category letter. Each audit row identifies
-one token or multiword construction; raw document counts can be recovered by
-summing the `count` column within a document and feature.
+A whole category can be audited at once, with an optional sample:
 
 ```{r}
 audit_features(udpipe_samples, category = "A", sample_n = 3, seed = 42)
 ```
+
+## Features that differ from English
+
+Most features carry over directly from English. A few are Spanish analogues of
+English constructions. Their column names describe what is counted:
+
+- `f_09_impersonal`: weather verbs and impersonal predicates (*Llueve*, *Es
+  importante que…*), the counterpart of English *it*.
+- `f_15_nominal_infinitives`: infinitives used as nouns (*Fumar perjudica la
+  salud*, *el saber*), the counterpart of English gerunds.
+- `f_60_reduced_complement`: an infinitive in place of a *que*-clause
+  (*Creo haber entendido*), the counterpart of English *that*-deletion.
+- `f_61_resumptive_relative`: a relative clause with a repeated pronoun (*el
+  chico que hablé de él*), the colloquial alternative to *el chico del que
+  hablé*.
+- `f_28_gerund_reduced_relative` is always 0: a gerund modifying a noun (*una
+  caja conteniendo libros*) is not standard Spanish.
+
+The README lists every feature with examples, and `FEATURES_TECHNICAL.md` in
+the package repository gives the exact rule behind each count.
+
+## Comparing languages
+
+Feature numbers are shared by the English (`pseudobibeR`), Spanish and French
+(`pseudobibeR.fr`) packages: `f_15` is the same feature in all three. To get
+the shared column names, for example to combine results across languages:
+
+```{r}
+shared <- biber(udpipe_samples, measure = "TTR", normalize = FALSE,
+                feature_names = "shared")
+names(shared)[c(10, 16, 19)]
+```
+
+`options(pseudobibeR.feature_names = "shared")` sets this for the whole
+session. Even with shared names, a feature in two languages may be an analogue
+rather than the identical construction, so compare scores across languages
+with care, and do not score Spanish texts against English factor loadings
+without validating them for Spanish.
