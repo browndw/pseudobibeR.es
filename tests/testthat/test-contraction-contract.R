@@ -1,22 +1,4 @@
-test_that("colloquial reductions use surfaces, not unreliable lemmas or POS gates", {
-  tokens <- contract_clause(
-    "forms", c("pa", "onde", "nde", "ontas", "ta", "tas", "toy", "t\u00e1bamos"),
-    rep("incorrect", 8), c("ADP", "PROPN", "ADV", "ADJ", "INTJ", "NOUN", "VERB", "VERB"),
-    rep(0, 8), rep("root", 8)
-  )
-  original <- tokens
-  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
-  expect_equal(raw$f_59_contractions, 8)
-  expect_equal(word_tokens(tokens), 8)
-  expect_equal(biber_fixture(tokens, measure = "none")$f_59_contractions, 1000)
-  evidence <- pseudobibeR.es:::biber_es_traced(tokens, measure = "none")$evidence
-  rows <- evidence[evidence$feature == "f_59_contractions", ]
-  expect_equal(rows$lemma, rep("incorrect", 8))
-  expect_equal(rows$upos, tokens$upos)
-  expect_identical(tokens, original)
-})
-
-test_that("apostrophe variants and fragmented expressions count once with complete evidence", {
+apostrophe_tokens <- function() {
   joined <- contract_clause(
     "joined", "pa\u2019ca\u2019rriba", "incorrect", "NOUN", 0, "root"
   )
@@ -28,31 +10,18 @@ test_that("apostrophe variants and fragmented expressions count once with comple
     "prefix", c("pa'", "rriba"), c("pa'", "rriba"), c("PUNCT", "NOUN"),
     c(0, 0), c("punct", "root")
   )
-  tokens <- rbind(joined, split, prefix)
-  for (input in list(tokens, structure(
-    dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats"),
-    class = c("spacyr_parsed", "data.frame")
-  ))) {
-    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
-    expect_equal(raw$f_59_contractions, c(1, 1, 1))
-    expect_equal(word_tokens(input), c(1, 4, 1))
-    expect_equal(biber_fixture(input, measure = "none")$f_59_contractions, c(1000, 250, 1000))
-    audit <- audit_fixture(input, feature = "f_59_contractions", window = 0)
-    expect_equal(audit$keyword, c("pa\u2019ca\u2019rriba", "pa \u2019 ca ' rriba", "pa' rriba"))
-    expect_equal(audit$count, c(1L, 1L, 1L))
-  }
-})
+  rbind(joined, split, prefix)
+}
 
-test_that("standard contractions, ordinary words and generic apostrophes are not f_59", {
-  tokens <- contract_clause(
+ordinary_tokens <- function() {
+  contract_clause(
     "ordinary", c("al", "del", "para", "donde", "estoy", "estas", "est\u00e1s",
                   "O'Connor", "d'Artagnan", "pa'xyz"),
     rep("incorrect", 10), rep("PROPN", 10), rep(0, 10), rep("root", 10)
   )
-  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_59_contractions, 0)
-})
+}
 
-test_that("nominal determiners and short nominal acronyms block obvious homographs", {
+homograph_tokens <- function() {
   noun <- contract_clause(
     "noun", c("un", "toy"), c("uno", "incorrect"), c("DET", "NOUN"),
     c(2, 0), c("det", "root")
@@ -62,28 +31,128 @@ test_that("nominal determiners and short nominal acronyms block obvious homograp
   verb$doc_id <- "uppercase_verb"
   verb$token <- "TOY"
   verb$upos <- verb$xpos <- "VERB"
-  raw <- biber_fixture(rbind(noun, acronym, verb), measure = "none", normalize = FALSE)
-  expect_equal(raw$f_59_contractions, c(0, 0, 1))
-})
+  rbind(noun, acronym, verb)
+}
 
-test_that("contraction matches respect sentence boundaries and noncontiguous IDs", {
+boundary_tokens <- function() {
   split <- contract_clause(
     "boundary", c("pa", "'", "que"), c("pa", "'", "que"),
     c("ADP", "PUNCT", "SCONJ"), c(0, 0, 0), rep("root", 3)
   )
   split$token_id <- c("3", "9", "20")
   split$sentence_id <- c(1L, 2L, 2L)
-  traced <- pseudobibeR.es:::biber_es_traced(split, measure = "none", normalize = FALSE)
-  rows <- traced$evidence[traced$evidence$feature == "f_59_contractions", ]
+  split
+}
+
+punct_tokens <- function() {
+  contract_clause("punct", "pa'", "pa'", "PUNCT", 0, "root")
+}
+
+# Pipeline calls have a large fixed cost: the independent UDPipe-schema
+# fixtures above run as one corpus (one traced raw call, one audit call);
+# counts, evidence and audit rows are per document. The audit keyword does
+# not depend on the context window.
+contraction_batch <- local({
+  cache <- NULL
+  function() {
+    if (is.null(cache)) {
+      tokens <- rbind(apostrophe_tokens(), ordinary_tokens(), homograph_tokens(),
+                      boundary_tokens(), punct_tokens())
+      cache <<- list(
+        traced = pseudobibeR.es:::biber_es_traced(tokens, measure = "none", normalize = FALSE),
+        audit = audit_fixture(tokens, feature = "f_59_contractions", window = 0)
+      )
+    }
+    cache
+  }
+})
+
+# Rows of a batched result for the documents of `tokens`, in result order.
+contraction_rows <- function(tokens) {
+  raw <- contraction_batch()$traced$counts
+  raw <- raw[raw$doc_id %in% tokens$doc_id, , drop = FALSE]
+  rownames(raw) <- NULL
+  raw
+}
+
+contraction_evidence <- function(tokens) {
+  evidence <- contraction_batch()$traced$evidence
+  evidence[evidence$doc_id %in% tokens$doc_id, ]
+}
+
+contraction_audit <- function(tokens) {
+  audit <- contraction_batch()$audit
+  audit[audit$doc_id %in% tokens$doc_id, ]
+}
+
+test_that("colloquial reductions use surfaces, not unreliable lemmas or POS gates", {
+  tokens <- contract_clause(
+    "forms", c("pa", "onde", "nde", "ontas", "ta", "tas", "toy", "t\u00e1bamos"),
+    rep("incorrect", 8), c("ADP", "PROPN", "ADV", "ADJ", "INTJ", "NOUN", "VERB", "VERB"),
+    rep(0, 8), rep("root", 8)
+  )
+  original <- tokens
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
+  expect_equal(raw$f_59_contractions, 8)
+  expect_equal(word_tokens(tokens), 8)
+  # One normalized traced call supplies both the rate and the evidence.
+  traced <- pseudobibeR.es:::biber_es_traced(tokens, measure = "none")
+  expect_equal(traced$counts$f_59_contractions, 1000)
+  evidence <- traced$evidence
+  rows <- evidence[evidence$feature == "f_59_contractions", ]
+  expect_equal(rows$lemma, rep("incorrect", 8))
+  expect_equal(rows$upos, tokens$upos)
+  expect_identical(tokens, original)
+})
+
+test_that("apostrophe variants and fragmented expressions count once with complete evidence", {
+  tokens <- apostrophe_tokens()
+  for (input in list(tokens, structure(
+    dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats"),
+    class = c("spacyr_parsed", "data.frame")
+  ))) {
+    batched <- !inherits(input, "spacyr_parsed")
+    raw <- if (batched) {
+      contraction_rows(input)
+    } else {
+      biber_fixture(input, measure = "none", normalize = FALSE)
+    }
+    expect_equal(raw$f_59_contractions, c(1, 1, 1))
+    expect_equal(word_tokens(input), c(1, 4, 1))
+    expect_equal(biber_fixture(input, measure = "none")$f_59_contractions, c(1000, 250, 1000))
+    audit <- if (batched) {
+      contraction_audit(input)
+    } else {
+      audit_fixture(input, feature = "f_59_contractions", window = 0)
+    }
+    expect_equal(audit$keyword, c("pa\u2019ca\u2019rriba", "pa \u2019 ca ' rriba", "pa' rriba"))
+    expect_equal(audit$count, c(1L, 1L, 1L))
+  }
+})
+
+test_that("standard contractions, ordinary words and generic apostrophes are not f_59", {
+  tokens <- ordinary_tokens()
+  expect_equal(contraction_rows(tokens)$f_59_contractions, 0)
+})
+
+test_that("nominal determiners and short nominal acronyms block obvious homographs", {
+  raw <- contraction_rows(homograph_tokens())
+  expect_equal(raw$f_59_contractions, c(0, 0, 1))
+})
+
+test_that("contraction matches respect sentence boundaries and noncontiguous IDs", {
+  split <- boundary_tokens()
+  evidence <- contraction_evidence(split)
+  rows <- evidence[evidence$feature == "f_59_contractions", ]
   expect_equal(nrow(rows), 1L)
   expect_equal(rows$token_id, 3L)
   expect_equal(rows$token, "pa")
-  expect_equal(audit_fixture(split, feature = "f_59_contractions")$keyword, "pa")
+  expect_equal(contraction_audit(split)$keyword, "pa")
 })
 
 test_that("a reduced spelling tagged PUNCT does not invent a denominator word", {
-  tokens <- contract_clause("punct", "pa'", "pa'", "PUNCT", 0, "root")
-  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
+  tokens <- punct_tokens()
+  raw <- contraction_rows(tokens)
   expect_equal(raw$f_59_contractions, 1)
   expect_equal(word_tokens(tokens), 0)
   expect_warning(normalized <- biber_fixture(tokens, measure = "none"), "no word tokens")

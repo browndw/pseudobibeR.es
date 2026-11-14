@@ -62,5 +62,16 @@ example to `es_core_news_sm`) and `RETICULATE_PYTHON` points to a Python with
 spaCy installed. Tests use the shared feature identifiers
 (`options(pseudobibeR.feature_names = "shared")` is set in a test helper).
 
+Each `biber()` call has a large fixed cost, so tests should not run the
+pipeline once per sentence. Declare a file's UDPipe sentences once with
+`ud_batch()` (in `helper-feature-coverage.R`), which parses and traces them as
+separate documents in one call, and read results with `$count()`, `$row()` or
+`$evidence()`. For hand-built annotations, give independent cases their own
+`doc_id` and run them together. Keep separate calls only when a test is about
+corpus-level behavior (MATTR fallback, document order) or call side effects.
+In CI, model-dependent tests run in the Ubuntu R CMD check job; other
+platforms skip them. Tests that read `data-raw/` run in a separate source-tree
+step of the same job, since `data-raw/` is not in the built package.
+
 Expected counts in examples and tests should come from linguistic judgment,
 not from the extractor's own output.

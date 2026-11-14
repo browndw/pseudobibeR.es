@@ -32,29 +32,19 @@ expect_synthetic_negation_contract <- function(tokens) {
                     c("ning\u00fan", "nadie", "nada", "nunca", "jam\u00e1s", "tampoco", "ni")))
 }
 
-test_that("synthetic lexical negatives retain per-word concord counts in both schemas", {
-  forms <- c("ning\u00fan", "ninguno", "ninguna", "ningunos", "ningunas",
-             "nadie", "nada", "nunca", "jam\u00e1s", "tampoco", "ni")
+negative_forms <- c("ning\u00fan", "ninguno", "ninguna", "ningunos", "ningunas",
+                    "nadie", "nada", "nunca", "jam\u00e1s", "tampoco", "ni")
+
+concord_tokens <- function(forms = negative_forms) {
   poses <- c(rep("DET", 5), "PRON", "PRON", "ADV", "ADV", "ADV", "CCONJ")
-  tokens <- do.call(rbind, lapply(seq_along(forms), function(i) {
+  do.call(rbind, lapply(seq_along(forms), function(i) {
     contract_clause(paste0("form_", i), c("No", "vino", forms[i]),
                     c("no", "venir", forms[i]), c("ADV", "VERB", poses[i]),
                     c(2, 0, 2), c("advmod", "root", "advmod"))
   }))
-  spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
-  class(spacy) <- c("spacyr_parsed", "data.frame")
-  for (input in list(tokens, spacy)) {
-    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
-    expect_equal(raw$f_66_neg_synthetic, rep(1, length(forms)))
-    expect_equal(raw$f_67_neg_analytic, rep(1, length(forms)))
-    expect_equal(word_tokens(input), rep(3, length(forms)))
-    expect_equal(biber_fixture(input, measure = "none")$f_66_neg_synthetic,
-                 rep(1000 / 3, length(forms)), tolerance = 0.001)
-    expect_equal(audit_fixture(input, feature = "f_66_neg_synthetic")$keyword, forms)
-  }
-})
+}
 
-test_that("ordinary nominal uses are excluded without discarding negative determiners", {
+nominal_use_tokens <- function() {
   nominal_nada <- contract_clause(
     "nominal_nada", c("La", "nada", "preocupa"), c("el", "nada", "preocupar"),
     c("DET", "PRON", "VERB"), c(2, 3, 0), c("det", "nsubj", "root")
@@ -67,34 +57,106 @@ test_that("ordinary nominal uses are excluded without discarding negative determ
     "genuine", c("La", "ninguna", "importancia"), c("el", "ninguno", "importancia"),
     c("DET", "DET", "NOUN"), c(3, 3, 0), c("det", "det", "root")
   )
-  raw <- biber_fixture(rbind(nominal_nada, nominal_nadie, genuine),
-               measure = "none", normalize = FALSE)
+  rbind(nominal_nada, nominal_nadie, genuine)
+}
+
+nadie_case <- function(id, word, relation, head = 2, head_pos = "VERB") {
+  contract_clause(id, c(word, "vino"), c(tolower(word), "venir"),
+                  c("PROPN", head_pos), c(head, 0), c(relation, "root"))
+}
+
+nadie_tokens <- function() {
+  do.call(rbind, list(
+    nadie_case("subject", "Nadie", "nsubj"),
+    nadie_case("passive_subject", "Nadie", "nsubj:pass"),
+    nadie_case("other_name", "Nada", "nsubj"),
+    nadie_case("object", "Nadie", "obj"),
+    nadie_case("missing", "Nadie", "nsubj", 9),
+    nadie_case("nonpredicate", "Nadie", "nsubj", head_pos = "NOUN")
+  ))
+}
+
+nadie_control_tokens <- function() {
+  control <- nadie_tokens()
+  control$lemma[control$lemma == "nadie"] <- "nombre"
+  control
+}
+
+# Pipeline calls have a large fixed cost: the independent UDPipe-schema
+# fixtures above run as one raw-count corpus and one audit corpus; counts and
+# audit rows are per document, so each test reads its own documents. The
+# Nadie control (raw) and its original (audit) share doc_ids, so they sit in
+# different corpora.
+negation_batch <- local({
+  cache <- NULL
+  function() {
+    if (is.null(cache)) {
+      shared <- rbind(concord_tokens(), nominal_use_tokens())
+      cache <<- list(
+        raw = biber_fixture(rbind(shared, nadie_control_tokens()),
+                            measure = "none", normalize = FALSE),
+        audit = audit_fixture(rbind(shared, nadie_tokens()), feature = "f_66_neg_synthetic")
+      )
+    }
+    cache
+  }
+})
+
+# Rows of a batched result for the documents of `tokens`, in result order.
+negation_rows <- function(tokens) {
+  raw <- negation_batch()$raw
+  raw <- raw[raw$doc_id %in% tokens$doc_id, , drop = FALSE]
+  rownames(raw) <- NULL
+  raw
+}
+
+negation_audit <- function(tokens) {
+  audit <- negation_batch()$audit
+  audit[audit$doc_id %in% tokens$doc_id, ]
+}
+
+test_that("synthetic lexical negatives retain per-word concord counts in both schemas", {
+  forms <- negative_forms
+  tokens <- concord_tokens(forms)
+  spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
+  class(spacy) <- c("spacyr_parsed", "data.frame")
+  for (input in list(tokens, spacy)) {
+    batched <- !inherits(input, "spacyr_parsed")
+    raw <- if (batched) {
+      negation_rows(input)
+    } else {
+      biber_fixture(input, measure = "none", normalize = FALSE)
+    }
+    expect_equal(raw$f_66_neg_synthetic, rep(1, length(forms)))
+    expect_equal(raw$f_67_neg_analytic, rep(1, length(forms)))
+    expect_equal(word_tokens(input), rep(3, length(forms)))
+    expect_equal(biber_fixture(input, measure = "none")$f_66_neg_synthetic,
+                 rep(1000 / 3, length(forms)), tolerance = 0.001)
+    audit <- if (batched) {
+      negation_audit(input)
+    } else {
+      audit_fixture(input, feature = "f_66_neg_synthetic")
+    }
+    expect_equal(audit$keyword, forms)
+  }
+})
+
+test_that("ordinary nominal uses are excluded without discarding negative determiners", {
+  tokens <- nominal_use_tokens()
+  raw <- negation_rows(tokens)
   expect_equal(raw$f_66_neg_synthetic, c(0, 0, 1))
-  expect_equal(audit_fixture(rbind(nominal_nada, nominal_nadie, genuine),
-                             feature = "f_66_neg_synthetic")$keyword, "ninguna")
+  expect_equal(negation_audit(tokens)$keyword, "ninguna")
 })
 
 test_that("Nadie recovery is restricted to the demonstrated verbal subject pattern", {
-  make_case <- function(id, word, relation, head = 2, head_pos = "VERB") {
-    contract_clause(id, c(word, "vino"), c(tolower(word), "venir"),
-                    c("PROPN", head_pos), c(head, 0), c(relation, "root"))
-  }
-  tokens <- do.call(rbind, list(
-    make_case("subject", "Nadie", "nsubj"),
-    make_case("passive_subject", "Nadie", "nsubj:pass"),
-    make_case("other_name", "Nada", "nsubj"),
-    make_case("object", "Nadie", "obj"),
-    make_case("missing", "Nadie", "nsubj", 9),
-    make_case("nonpredicate", "Nadie", "nsubj", head_pos = "NOUN")
-  ))
+  tokens <- nadie_tokens()
   raw <- biber_fixture(tokens, measure = "TTR", normalize = FALSE)
   expect_equal(raw$f_66_neg_synthetic, c(1, 1, 0, 0, 0, 0))
-  control <- tokens
-  control$lemma[control$lemma == "nadie"] <- "nombre"
-  control_raw <- biber_fixture(control, measure = "none", normalize = FALSE)
+  control <- nadie_control_tokens()
+  control_raw <- negation_rows(control)
   keep <- setdiff(names(control_raw), "f_66_neg_synthetic")
   expect_equal(raw[keep], control_raw[keep])
-  audit <- audit_fixture(tokens, feature = "f_66_neg_synthetic")
+  audit <- negation_audit(tokens)
   expect_equal(audit$keyword, c("Nadie", "Nadie"))
   expect_true(all(tokens$upos[tokens$lemma == "nadie"] == "PROPN"))
 })

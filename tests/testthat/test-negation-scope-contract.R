@@ -47,8 +47,10 @@ test_that("analytic no can scope over nominal and function-word heads in both sc
   spacy$pos[spacy$lemma == "no"] <- "PART"
   spacy$dep_rel[spacy$lemma == "no"] <- "neg"
   class(spacy) <- c("spacyr_parsed", "data.frame")
+  raws <- list()
   for (input in list(tokens, spacy)) {
     raw <- biber_fixture(input, measure = "none", normalize = FALSE)
+    raws[[length(raws) + 1L]] <- raw
     expect_equal(raw$f_67_neg_analytic, rep(1, length(heads)))
     expect_equal(raw$f_66_neg_synthetic, rep(0, length(heads)))
     expect_equal(raw$f_16_other_nouns[1:2], c(1, 1))
@@ -58,10 +60,8 @@ test_that("analytic no can scope over nominal and function-word heads in both sc
     expect_equal(audit_fixture(input, feature = "f_67_neg_analytic")$keyword,
                  rep("No", length(heads)))
   }
-  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_42_adverbs[1:2],
-               c(1, 1))
-  expect_equal(biber_fixture(spacy, measure = "none", normalize = FALSE)$f_42_adverbs[1:2],
-               c(0, 0))
+  expect_equal(raws[[1]]$f_42_adverbs[1:2], c(1, 1))
+  expect_equal(raws[[2]]$f_42_adverbs[1:2], c(0, 0))
 })
 
 test_that("no obstante and identifiable nominal no are not analytic negators", {

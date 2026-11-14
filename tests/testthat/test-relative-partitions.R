@@ -26,8 +26,9 @@ test_that("relative marker family and role define four exclusive bins", {
     expect_equal(unname(as.matrix(raw[relative_features[1:4]])), diag(4))
     expect_equal(rowSums(raw[relative_features]), rep(1, 4))
     expect_equal(biber_fixture(input, measure = "none")$f_31_wh_subj, c(0, 0, 1000 / 3, 0))
+    audits <- audit_by_feature(input, relative_features[1:4])
     for (feature in relative_features[1:4]) {
-      expect_equal(nrow(audit_fixture(input, feature = feature)), 1L)
+      expect_equal(nrow(audits[[feature]]), 1L)
     }
   }
   expect_identical(tokens, original)
@@ -40,10 +41,12 @@ test_that("a conflicting explicit subject repairs a relative incorrectly tagged 
     c(0, 4, 4, 1), c("root", "nsubj", "nsubj", "acl:relcl"),
     c("Number=Sing", "PronType=Rel|Number=Sing", NA, "VerbForm=Fin|Person=3|Number=Sing")
   )
-  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
+  # One traced call gives both the raw counts and the evidence.
+  traced <- pseudobibeR.es:::biber_es_traced(tokens, measure = "none", normalize = FALSE)
+  raw <- traced$counts
   expect_equal(raw$f_31_wh_subj, 0)
   expect_equal(raw$f_32_wh_obj, 1)
-  evidence <- pseudobibeR.es:::biber_es_traced(tokens, measure = "none")$evidence
+  evidence <- traced$evidence
   expect_equal(evidence$upos[evidence$feature == "f_32_wh_obj"], "PRON")
   expect_equal(tokens$dep_rel[2], "nsubj")
 })
@@ -172,8 +175,9 @@ expect_relative_partition_baseline <- function(tokens) {
   expect_equal(unname(as.matrix(traced$counts[relative_features])), expected)
   rows <- traced$evidence[traced$evidence$feature %in% relative_features, ]
   expect_equal(anyDuplicated(rows[c("doc_id", "sentence_id", "token_id")]), 0L)
+  audits <- audit_by_feature(tokens, relative_features)
   for (feature in relative_features) {
-    audit <- audit_fixture(tokens, feature = feature)
+    audit <- audits[[feature]]
     expect_equal(tabulate(match(audit$doc_id, traced$counts$doc_id), nbins = 9),
                  expected[, match(feature, relative_features)])
   }
@@ -212,12 +216,14 @@ test_that("shipped wh-relative examples distinguish nominal relatives from quest
   examples <- pseudobibeR.es::spanish_examples
   examples <- examples[examples$feature %in% c("f_31_wh_subj", "f_32_wh_obj"), ]
   expect_equal(nrow(examples), 4L)
+  # Parse and count all four examples once; each row is its own document.
+  ids <- paste0("example_", seq_len(nrow(examples)))
+  tokens <- udpipe::udpipe_annotate(.fc_ud(), x = examples$example, doc_id = ids)
+  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   for (feature in c("f_31_wh_subj", "f_32_wh_obj")) {
     subset <- examples[examples$feature == feature, ]
     expect_true(all(c(0, 1) %in% subset$count))
-    tokens <- udpipe::udpipe_annotate(
-      .fc_ud(), x = subset$example, doc_id = paste0("example_", seq_len(nrow(subset)))
-    )
-    expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)[[feature]], subset$count)
+    rows <- match(ids[examples$feature == feature], raw$doc_id)
+    expect_equal(raw[[feature]][rows], subset$count)
   }
 })

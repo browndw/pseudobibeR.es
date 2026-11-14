@@ -31,8 +31,9 @@ test_that("modals recognize passive chains and require their periphrastic marker
   headed <- passive
   headed$head_token_id[c(1, 2, 4)] <- c("0", "4", "1")
   headed$dep_rel[c(1, 4)] <- c("root", "ccomp")
-  expect_equal(biber_fixture(headed, measure = "none", normalize = FALSE)$f_53_modal_necessity, 1)
-  expect_equal(biber_fixture(headed, measure = "none", normalize = FALSE)$f_02_perfect_aspect, 0)
+  raw_headed <- biber_fixture(headed, measure = "none", normalize = FALSE)
+  expect_equal(raw_headed$f_53_modal_necessity, 1)
+  expect_equal(raw_headed$f_02_perfect_aspect, 0)
   spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
   class(spacy) <- c("spacyr_parsed", "data.frame")
   expect_equal(biber_fixture(spacy, measure = "none", normalize = FALSE), raw)
@@ -44,7 +45,6 @@ test_that("puede que accepts an explicitly subjunctive complement clause", {
     c("VERB", "SCONJ", "VERB"), c(0, 3, 1), c("root", "mark", "ccomp"),
     c("VerbForm=Fin", NA, "Mood=Sub|VerbForm=Fin")
   )
-  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_52_modal_possibility, 1)
   expect_equal(audit_fixture(tokens, feature = "f_52_modal_possibility")$keyword, "puede")
   perfect <- contract_clause(
     "perfect", c("puede", "que", "haya", "sido", "revisado"),
@@ -53,7 +53,9 @@ test_that("puede que accepts an explicitly subjunctive complement clause", {
     c("root", "mark", "aux", "aux:pass", "ccomp"),
     c("VerbForm=Fin", NA, "Mood=Sub|VerbForm=Fin", "VerbForm=Part", "VerbForm=Part")
   )
-  raw <- biber_fixture(perfect, measure = "none", normalize = FALSE)
+  both <- biber_fixture(rbind(tokens, perfect), measure = "none", normalize = FALSE)
+  expect_equal(both$f_52_modal_possibility[both$doc_id == "possible"], 1)
+  raw <- both[both$doc_id == "perfect", ]
   expect_equal(raw$f_52_modal_possibility, 1)
   expect_equal(raw$f_02_perfect_aspect, 1)
 })
@@ -67,9 +69,12 @@ test_that("modal copular complements work with either dependency direction", {
   auxiliary <- headed
   auxiliary$head_token_id[c(1, 3)] <- c("3", "0")
   auxiliary$dep_rel[c(1, 3)] <- c("aux", "root")
-  raw <- biber_fixture(headed, measure = "none", normalize = FALSE)
-  expect_equal(raw$f_52_modal_possibility, 1)
-  expect_equal(biber_fixture(auxiliary, measure = "none", normalize = FALSE), raw)
+  rows <- biber_docs(list(headed = headed, auxiliary = auxiliary),
+                     measure = "none", normalize = FALSE)
+  expect_equal(rows$f_52_modal_possibility[1], 1)
+  # Both documents share every feature value; only the relabelled doc_id differs.
+  features <- setdiff(names(rows), "doc_id")
+  expect_equal(as.list(rows[2, features]), as.list(rows[1, features]))
 })
 
 test_that("predictive ir a requires a and supports both dependency directions", {
@@ -124,21 +129,25 @@ test_that("pronominal lexical entries are detected without surface conjugation p
   raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_56_verb_private, c(1, 0, 0, 1))
   expect_equal(raw$f_58_verb_seem, c(0, 0, 1, 0))
-  expect_setequal(audit_fixture(tokens, feature = "f_56_verb_private")$keyword,
-                  c("dio", "ve"))
-  expect_equal(audit_fixture(tokens, feature = "f_58_verb_seem")$doc_id, "appearance")
+  audits <- audit_by_feature(tokens, c("f_56_verb_private", "f_58_verb_seem"))
+  expect_setequal(audits$f_56_verb_private$keyword, c("dio", "ve"))
+  expect_equal(audits$f_58_verb_seem$doc_id, "appearance")
   appearance$head_token_id[1] <- "3"
-  expect_equal(biber_fixture(appearance, measure = "none", normalize = FALSE)$f_58_verb_seem, 1)
   first_person <- contract_clause(
     "first_person", c("me", "veo", "cansado"), c("yo", "ver", "cansado"),
     c("PRON", "VERB", "ADJ"), c(2, 0, 2), c("iobj", "root", "xcomp"),
     c("Reflex=Yes|Person=1", "VerbForm=Fin|Person=1", NA)
   )
-  raw_first_person <- biber_fixture(first_person, measure = "none", normalize = FALSE)
+  realization$sentence_id[1] <- 2L
+  variants <- biber_docs(
+    list(appearance = appearance, first_person = first_person, realization = realization),
+    measure = "none", normalize = FALSE
+  )
+  expect_equal(variants$f_58_verb_seem[1], 1)
+  raw_first_person <- variants[2, ]
   expect_equal(raw_first_person$f_58_verb_seem, 1)
   expect_equal(raw_first_person$f_56_verb_private, 0)
-  realization$sentence_id[1] <- 2L
-  expect_equal(biber_fixture(realization, measure = "none", normalize = FALSE)$f_56_verb_private, 0)
+  expect_equal(variants$f_56_verb_private[3], 0)
 })
 
 test_that("specialized verb classes use lemmas and POS with exact occurrence evidence", {
@@ -149,9 +158,10 @@ test_that("specialized verb classes use lemmas and POS with exact occurrence evi
   )
   raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   features <- c("f_55_verb_public", "f_56_verb_private", "f_57_verb_suasive", "f_58_verb_seem")
+  audits <- audit_by_feature(tokens, features)
   for (feature in features) {
     expect_equal(raw[[feature]], 1)
-    expect_equal(nrow(audit_fixture(tokens, feature = feature)), 1L)
+    expect_equal(nrow(audits[[feature]]), 1L)
   }
   spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
   class(spacy) <- c("spacyr_parsed", "data.frame")
@@ -169,17 +179,20 @@ test_that("Spanish-GSD preserves modal chains and exposes mislemmatized podria",
     doc_id = c("possibility", "necessity", "impersonal", "headed", "future",
                "realization", "appearance", "mislemma")
   ))
-  raw <- biber_fixture(parsed, measure = "none", normalize = FALSE)
+  mislemma <- parsed[parsed$doc_id == "mislemma", ]
+  expect_equal(mislemma$lemma[1], "podrer")
+  mislemma$lemma[1] <- "poder"
+  mislemma$doc_id <- "corrected"
+  # One call: the eight parsed documents plus the corrected copy.
+  all <- biber_fixture(rbind(parsed, mislemma), measure = "none", normalize = FALSE)
+  raw <- all[all$doc_id != "corrected", ]
   expect_equal(raw$f_52_modal_possibility, c(1, 0, 0, 0, 0, 0, 0, 0))
   expect_equal(raw$f_53_modal_necessity, c(0, 1, 1, 1, 0, 0, 0, 0))
   expect_equal(raw$f_54_modal_predictive, c(0, 0, 0, 0, 1, 0, 0, 1))
   expect_equal(raw$f_56_verb_private, c(0, 0, 0, 0, 0, 1, 0, 0))
   expect_equal(raw$f_58_verb_seem, c(0, 0, 0, 0, 0, 0, 1, 0))
   expect_equal(raw$f_63_split_auxiliary, rep(0, 8))
-  mislemma <- parsed[parsed$doc_id == "mislemma", ]
-  expect_equal(mislemma$lemma[1], "podrer")
-  mislemma$lemma[1] <- "poder"
-  corrected <- biber_fixture(mislemma, measure = "none", normalize = FALSE)
+  corrected <- all[all$doc_id == "corrected", ]
   expect_equal(corrected$f_52_modal_possibility, 1)
   expect_equal(corrected$f_63_split_auxiliary, 1)
 })

@@ -45,6 +45,34 @@ audit_fixture <- function(tokens, feature = NULL, category = NULL, sample_n = NU
                                           max_per_doc, window, engine)
 }
 
+# Each pipeline call has a large fixed cost; prefer one call per fixture.
+#
+# audit_by_feature(): one audit of several features, split into a named list.
+# Without sampling, each element equals audit_fixture(tokens, feature = f).
+audit_by_feature <- function(tokens, features, window = 5) {
+  audit <- audit_fixture(tokens, feature = features, window = window)
+  stats::setNames(lapply(features, function(f) audit[audit$feature == f, ]), features)
+}
+
+# biber_docs(): run independent single-document fixtures (same schema) as one
+# corpus. Each element is relabelled with its list name as doc_id; the result
+# keeps that order. Counts are per document, so rows equal separate calls
+# except for corpus-level choices (the MATTR -> TTR fallback, MSTTR segments).
+biber_docs <- function(fixtures, measure = c("MATTR", "TTR", "CTTR", "MSTTR", "none"),
+                       normalize = TRUE, traced = FALSE) {
+  stopifnot(length(names(fixtures)) == length(fixtures), !anyDuplicated(names(fixtures)))
+  tokens <- do.call(rbind, Map(function(x, id) {
+    x$doc_id <- id
+    x
+  }, fixtures, names(fixtures)))
+  rownames(tokens) <- NULL
+  if (traced) {
+    return(pseudobibeR.es:::biber_es_traced(tokens, measure = match.arg(measure),
+                                            normalize = normalize))
+  }
+  biber_fixture(tokens, measure = match.arg(measure), normalize = normalize)
+}
+
 # Per-document normalization denominator (word rows without punctuation,
 # symbols, spaces or digit-final numerals).
 word_tokens <- function(tokens) {

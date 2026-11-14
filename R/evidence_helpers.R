@@ -231,22 +231,17 @@ bind_evidence <- function(...) {
 #' @keywords internal
 #' @noRd
 count_feature_traced <- function(tbl, feature_name) {
-  # Same dedup as count_feature() -- exact replica of the logic to
-  # preserve count parity.
-  dedup <- tbl %>%
-    dplyr::mutate(
-      .tid_dedup = dplyr::if_else(
-        is.na(.data$token_id_int),
-        -.Machine$integer.max + dplyr::row_number(),
-        .data$token_id_int
-      )
-    ) %>%
-    dplyr::distinct(.data$doc_id, .data$sentence_id, .data$.tid_dedup, .keep_all = TRUE)
+  # One row per (doc_id, sentence_id, token_id_int), keeping the first
+  # occurrence; rows without a token ID are never collapsed.
+  tid <- tbl$token_id_int
+  key <- paste(tbl$doc_id, tbl$sentence_id, tid, sep = "\x1f")
+  dedup <- tbl[is.na(tid) | !duplicated(key), ]
 
-  counts <- dedup %>%
-    dplyr::group_by(.data$doc_id) %>%
-    dplyr::tally() %>%
-    dplyr::rename(!!feature_name := "n")
+  # Same shape as group_by(doc_id) + tally(): one row per document, sorted in
+  # the C locale, with an integer count named after the feature.
+  docs <- sort(unique(dedup$doc_id), method = "radix")
+  counts <- tibble::tibble(doc_id = docs)
+  counts[[feature_name]] <- tabulate(match(dedup$doc_id, docs), nbins = length(docs))
 
   evidence <- if (nrow(dedup) == 0L) {
     empty_evidence_tibble()

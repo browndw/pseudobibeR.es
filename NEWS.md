@@ -34,6 +34,9 @@
   multiword flagging are vectorized. MATTR is computed with a linear sliding
   window that reproduces `quanteda.textstats::textstat_lexdiv()` exactly,
   including its re-tokenization of window text.
+- Per-call overhead is about 20% lower, which mainly benefits small inputs:
+  feature counting in the extraction blocks no longer runs several dplyr verbs
+  per feature.
 
 ## Corrections that change results
 

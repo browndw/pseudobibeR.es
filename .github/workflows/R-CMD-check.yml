@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, master]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   R-CMD-check:
     runs-on: ${{ matrix.config.os }}
@@ -41,7 +45,25 @@ jobs:
           cache-version: 3
           upgrade: 'TRUE'
 
+      # tests/models is excluded from the built package, so point the checked
+      # tests at the committed model. Model-dependent tests run once, on
+      # Ubuntu; other platforms skip them.
+      - name: Use committed UDPipe model for tests
+        if: runner.os == 'Linux'
+        run: echo "PSEUDOBIBER_ES_UDPIPE_MODEL=$GITHUB_WORKSPACE/tests/models/spanish-gsd-ud-2.5-191206.udpipe" >> "$GITHUB_ENV"
+
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
+
+      # These tests read data-raw/, which is excluded from the built package,
+      # so they skip inside R CMD check and run here on the source tree.
+      - name: Run source-tree tests
+        if: runner.os == 'Linux'
+        env:
+          NOT_CRAN: true
+        run: |
+          testthat::test_local(filter = "spanish-examples|lexical-linguistics",
+                               stop_on_failure = TRUE, stop_on_warning = TRUE)
+        shell: Rscript {0}

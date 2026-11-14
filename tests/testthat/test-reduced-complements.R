@@ -82,18 +82,26 @@ test_that("overt clause introducers and indirect questions exclude reductions", 
   question$feats[2] <- "PronType=Int"
   question$feats[3] <- "VerbForm=Inf"
   tokens <- rbind(marked, preposition, question)
-  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_60_that_deletion,
-               rep(0, 3))
-  marked$upos[2] <- marked$xpos[2] <- "PRON"
-  marked$dep_rel[2] <- "obj"
-  marked$feats[2] <- "PronType=Rel"
-  expect_equal(biber_fixture(marked, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
-  marked$token[2] <- marked$lemma[2] <- "quien"
-  expect_equal(biber_fixture(marked, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
-  expect_equal(biber_fixture(question, measure = "none", normalize = FALSE)$f_23_wh_clause, 1)
-  question$upos[2] <- question$xpos[2] <- "PRON"
-  question$feats[2] <- "PronType=Ind"
-  expect_equal(biber_fixture(question, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
+  relative <- marked
+  relative$doc_id <- "relative"
+  relative$upos[2] <- relative$xpos[2] <- "PRON"
+  relative$dep_rel[2] <- "obj"
+  relative$feats[2] <- "PronType=Rel"
+  quien <- relative
+  quien$doc_id <- "quien"
+  quien$token[2] <- quien$lemma[2] <- "quien"
+  indefinite <- question
+  indefinite$doc_id <- "indefinite"
+  indefinite$upos[2] <- indefinite$xpos[2] <- "PRON"
+  indefinite$feats[2] <- "PronType=Ind"
+  # Independent documents, one call.
+  raw <- biber_fixture(rbind(tokens, relative, quien, indefinite),
+                       measure = "none", normalize = FALSE)
+  expect_equal(raw$f_60_that_deletion[1:3], rep(0, 3))
+  expect_equal(raw$f_60_that_deletion[raw$doc_id == "relative"], 0)
+  expect_equal(raw$f_60_that_deletion[raw$doc_id == "quien"], 0)
+  expect_equal(raw$f_23_wh_clause[raw$doc_id == "question"], 1)
+  expect_equal(raw$f_60_that_deletion[raw$doc_id == "indefinite"], 0)
 })
 
 test_that("coordinated complements inherit governors and overt introducers", {
@@ -140,13 +148,17 @@ test_that("complement links stay within documents and sentences and use supplied
   tokens <- reduction_clause("noncontiguous")
   tokens$token_id <- c("10", "30")
   tokens$head_token_id[2] <- "10"
-  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_60_that_deletion, 1)
-  traced <- pseudobibeR.es:::biber_es_traced(tokens, measure = "none")
+  separate <- tokens
+  separate$doc_id <- "sentences"
+  separate$sentence_id[2] <- 2L
+  # Raw counts and evidence from one traced call; the sentence-split fixture is
+  # an independent document.
+  traced <- pseudobibeR.es:::biber_es_traced(rbind(tokens, separate), measure = "none",
+                                             normalize = FALSE)
+  expect_equal(traced$counts$f_60_that_deletion[traced$counts$doc_id == "noncontiguous"], 1)
   expect_equal(traced$evidence$token_id[traced$evidence$feature == "f_60_that_deletion"],
                30L)
-  separate <- tokens
-  separate$sentence_id[2] <- 2L
-  expect_equal(biber_fixture(separate, measure = "none", normalize = FALSE)$f_60_that_deletion, 0)
+  expect_equal(traced$counts$f_60_that_deletion[traced$counts$doc_id == "sentences"], 0)
   separate$sentence_id <- 1L
   separate$doc_id <- c("governor", "complement")
   expect_equal(biber_fixture(separate, measure = "none", normalize = FALSE)$f_60_that_deletion,

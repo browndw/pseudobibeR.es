@@ -35,18 +35,25 @@ test_that("fine-grained tags are retained and missing tags use UPOS", {
     "fine_tags", c("Lunes", "lunes"), c("NOUN", "NOUN"),
     c("NCMS000", "ncmp000")
   )
-  fine <- biber_fixture(tokens, measure = "TTR")
-  expect_equal(fine$f_43_type_token, 1)
-  expect_equal(fine$f_44_mean_word_length, 5)
-  tokens$xpos <- c("NCMS000", "ncms000")
-  expect_equal(biber_fixture(tokens, measure = "TTR")$f_43_type_token, 0.5)
+  same_tag <- tokens
+  same_tag$xpos <- c("NCMS000", "ncms000")
 
   missing <- lexical_input_tokens(
     "missing", c("Canto", "canto"), c("NOUN", "VERB")
   )
-  for (tag in list(NA_character_, "", "_")) {
+  missing_tags <- list(missing_na = NA_character_, missing_empty = "", missing_underscore = "_")
+  # TTR is per document, so all variants run as one corpus.
+  docs <- c(list(fine_tags = tokens, same_tag = same_tag), lapply(missing_tags, function(tag) {
     missing$xpos <- rep(tag, 2)
-    expect_equal(biber_fixture(missing, measure = "TTR")$f_43_type_token, 1)
+    missing
+  }))
+  result <- biber_docs(docs, measure = "TTR")
+  fine <- result[result$doc_id == "fine_tags", ]
+  expect_equal(fine$f_43_type_token, 1)
+  expect_equal(fine$f_44_mean_word_length, 5)
+  expect_equal(result$f_43_type_token[result$doc_id == "same_tag"], 0.5)
+  for (id in names(missing_tags)) {
+    expect_equal(result$f_43_type_token[result$doc_id == id], 1)
   }
 })
 

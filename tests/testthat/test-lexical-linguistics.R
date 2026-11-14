@@ -11,9 +11,10 @@ test_that("nominalizations and other nouns partition UD noun words including hyp
   expect_equal(raw$f_14_nominalizations, 2)
   expect_equal(raw$f_16_other_nouns, 3)
   expect_equal(raw$f_14_nominalizations + raw$f_16_other_nouns, 5)
-  expect_setequal(audit_fixture(tokens, feature = "f_14_nominalizations")$keyword,
+  audits <- audit_by_feature(tokens, c("f_14_nominalizations", "f_16_other_nouns"))
+  expect_setequal(audits$f_14_nominalizations$keyword,
                   c("producciones", "riqueza"))
-  expect_setequal(audit_fixture(tokens, feature = "f_16_other_nouns")$keyword,
+  expect_setequal(audits$f_16_other_nouns$keyword,
                   c("ciudades", "Concepcion", "coche-cama"))
 })
 
@@ -110,9 +111,10 @@ test_that("counted place and time phrases are excluded from f_42", {
   expect_equal(raw$f_04_place_adverbials, c(2, 0))
   expect_equal(raw$f_05_time_adverbials, c(0, 2))
   expect_equal(raw$f_42_adverbs, c(0, 0))
-  expect_setequal(audit_fixture(tokens, feature = "f_04_place_adverbials")$keyword,
+  audits <- audit_by_feature(tokens, c("f_04_place_adverbials", "f_05_time_adverbials"))
+  expect_setequal(audits$f_04_place_adverbials$keyword,
                   c("alrededor de", "aqui"))
-  expect_setequal(audit_fixture(tokens, feature = "f_05_time_adverbials")$keyword,
+  expect_setequal(audits$f_05_time_adverbials$keyword,
                   c("de vez en cuando", "hoy"))
 })
 
@@ -132,8 +134,9 @@ test_that("dictionary phrases are contained-deduplicated and sentence-local", {
   raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
   expect_equal(raw$f_46_downtoners, c(1, 0, 0))
   expect_equal(raw$f_45_conjuncts, c(0, 1, 0))
-  expect_equal(audit_fixture(tokens, feature = "f_46_downtoners")$keyword, "Un poco")
-  expect_equal(audit_fixture(tokens, feature = "f_45_conjuncts")$keyword, "Sin embargo")
+  audits <- audit_by_feature(tokens, c("f_46_downtoners", "f_45_conjuncts"))
+  expect_equal(audits$f_46_downtoners$keyword, "Un poco")
+  expect_equal(audits$f_45_conjuncts$keyword, "Sin embargo")
 })
 
 test_that("every lexical dictionary entry has an exact full-span occurrence", {

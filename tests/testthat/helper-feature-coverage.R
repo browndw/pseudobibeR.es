@@ -53,4 +53,50 @@ run_biber <- function(text, normalize = FALSE) {
   suppressMessages(biber_fixture(parsed, measure = "TTR", normalize = normalize))
 }
 
+# Batched UDPipe sentences. Each pipeline call has a large fixed cost, so a
+# file declares its sentences once; they are parsed as separate documents and
+# traced in one call on first use (inside a test, so missing models skip).
+# Counts are per document, so batching gives the same values as one call per
+# sentence with measure = "TTR" and normalize = FALSE.
+#
+#   b <- ud_batch(c("Llueve.", "Hay un problema."))
+#   b$count("Llueve.", "f_09_pronoun_it")
+#   b$row("Llueve.")             # one-row counts data frame
+#   b$evidence("Llueve.", "f_09_pronoun_it")
+ud_batch <- function(texts) {
+  texts <- unique(texts)
+  ids <- sprintf("s%04d", seq_along(texts))
+  result <- NULL
+  get <- function() {
+    if (is.null(result)) {
+      parsed <- udpipe::udpipe_annotate(.fc_ud(), x = texts, doc_id = ids)
+      result <<- suppressMessages(
+        pseudobibeR.es:::biber_es_traced(parsed, measure = "TTR", normalize = FALSE)
+      )
+    }
+    result
+  }
+  id_of <- function(text) {
+    id <- ids[match(text, texts)]
+    if (is.na(id)) stop("Sentence not declared in ud_batch(): ", text, call. = FALSE)
+    id
+  }
+  list(
+    texts = texts,
+    result = get,
+    row = function(text) {
+      counts <- get()$counts
+      counts[counts$doc_id == id_of(text), , drop = FALSE]
+    },
+    count = function(text, feature) {
+      counts <- get()$counts
+      as.numeric(counts[[feature]][counts$doc_id == id_of(text)])
+    },
+    evidence = function(text, feature) {
+      evidence <- get()$evidence
+      evidence[evidence$doc_id == id_of(text) & evidence$feature == feature, ]
+    }
+  )
+}
+
 # nolint end

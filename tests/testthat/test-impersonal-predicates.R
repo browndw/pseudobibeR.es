@@ -122,9 +122,11 @@ test_that("predicate links are sentence-local and tolerate noncontiguous word ID
     c(fin, NA, "VerbForm=Inf")
   )
   tokens$token_id <- c("1", "4", "9")
-  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it, 1)
-  tokens$sentence_id[3] <- 2L
-  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it, 0)
+  split <- tokens
+  split$sentence_id[3] <- 2L
+  raw <- biber_docs(list(gap = tokens, split = split), measure = "none", normalize = FALSE)
+  expect_equal(raw$f_09_pronoun_it[1], 1)
+  expect_equal(raw$f_09_pronoun_it[2], 0)
 })
 
 test_that("UD empty nodes are not counted or invented as f_09 occurrences", {
@@ -168,23 +170,34 @@ test_that("selected impersonal verbs require their own postposed clausal links",
       c(fin, NA, fin)
     )
   }))
-  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it,
-               rep(1, 6))
+  # The variants run as one corpus; a prefix keeps their doc_ids distinct.
+  variants <- list(ccomp = tokens)
   tokens$dep_rel[tokens$dep_rel == "ccomp"] <- "csubj"
-  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it,
-               rep(1, 6))
+  variants$csubj <- tokens
   tokens$sentence_id[tokens$token == "que"] <- 2L
-  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it,
-               rep(0, 6))
+  variants$split <- tokens
   tokens$sentence_id <- 1L
   tokens$doc_id[tokens$token == "que"] <-
     paste0(tokens$doc_id[tokens$token == "que"], "_unrelated")
-  expect_true(all(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_09_pronoun_it == 0))
+  variants$unrelated <- tokens
   infinitival <- contract_clause(
     "infinitival", c("Conviene", "descansar"), c("convenir", "descansar"),
     c("VERB", "VERB"), c(0, 1), c("root", "xcomp"), c(fin, "VerbForm=Inf")
   )
-  expect_equal(biber_fixture(infinitival, measure = "none", normalize = FALSE)$f_09_pronoun_it, 1)
+  variants$infinitival <- infinitival
+  combined <- do.call(rbind, Map(function(x, prefix) {
+    x$doc_id <- paste0(prefix, "/", x$doc_id)
+    x
+  }, variants, names(variants)))
+  raw <- biber_fixture(combined, measure = "none", normalize = FALSE)
+  f_09 <- function(prefix) {
+    raw$f_09_pronoun_it[startsWith(raw$doc_id, paste0(prefix, "/"))]
+  }
+  expect_equal(f_09("ccomp"), rep(1, 6))
+  expect_equal(f_09("csubj"), rep(1, 6))
+  expect_equal(f_09("split"), rep(0, 6))
+  expect_true(all(f_09("unrelated") == 0))
+  expect_equal(f_09("infinitival"), 1)
 })
 
 test_that("weather predicates respect controlling subjects and finite auxiliary agreement", {

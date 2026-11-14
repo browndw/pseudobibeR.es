@@ -23,27 +23,7 @@ expect_proverb_baseline <- function(tokens) {
                     c("hizo", "hacer", "hacerlo", "haci\u00e9ndo", "haci\u00e9ndolo")))
 }
 
-test_that("f_12 counts the lexical predicate, preserving pronouns and word populations", {
-  fin <- "Person=3|Number=Sing|VerbForm=Fin"
-  tokens <- contract_clause(
-    "action", c("Lo", "hizo"), c("\u00e9l", "hacer"), c("PRON", "VERB"),
-    c(2, 0), c("obj", "root"), c("Case=Acc|Gender=Masc|PronType=Prs", fin)
-  )
-  spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
-  class(spacy) <- c("spacyr_parsed", "data.frame")
-  original <- tokens
-  for (input in list(tokens, spacy)) {
-    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
-    expect_equal(raw$f_12_proverb_do, 1)
-    expect_equal(raw$f_08_third_person_pronouns, 1)
-    expect_equal(word_tokens(input), 2)
-    expect_equal(biber_fixture(input, measure = "none")$f_12_proverb_do, 500)
-    expect_equal(audit_fixture(input, feature = "f_12_proverb_do")$keyword, "hizo")
-  }
-  expect_identical(tokens, original)
-})
-
-test_that("f_12 excludes auxiliary/copular, causative, reflexive and nominal-object hacer", {
+excluded_proverb_tokens <- function() {
   fin <- "Person=3|Number=Sing|VerbForm=Fin"
   base <- contract_clause(
     "base", c("Lo", "hizo"), c("\u00e9l", "hacer"), c("PRON", "VERB"),
@@ -74,13 +54,10 @@ test_that("f_12 excludes auxiliary/copular, causative, reflexive and nominal-obj
   feminine <- base
   feminine$doc_id <- "feminine"
   feminine$token[1] <- "La"
-  raw <- biber_fixture(rbind(auxiliary, copular, causative, reflexive, nominal, feminine),
-               measure = "none", normalize = FALSE)
-  expect_equal(raw$f_12_proverb_do, rep(0, 6))
-  expect_equal(raw$f_16_other_nouns[raw$doc_id == "nominal"], 1)
-})
+  rbind(auxiliary, copular, causative, reflexive, nominal, feminine)
+}
 
-test_that("split and integrated enclitics recover only the approved hacer representation", {
+enclitic_tokens <- function() {
   integrated <- contract_clause(
     "integrated", "hacerlo", "hacer \u00e9l", "VERB", 0, "root", "VerbForm=Inf"
   )
@@ -92,24 +69,96 @@ test_that("split and integrated enclitics recover only the approved hacer repres
   different$doc_id <- "different"
   different$token <- "verlo"
   different$lemma <- "ver \u00e9l"
-  raw <- biber_fixture(rbind(integrated, gerund, different), measure = "none", normalize = FALSE)
-  expect_equal(raw$f_12_proverb_do, c(1, 1, 0))
-  expect_equal(word_tokens(rbind(integrated, gerund, different)), c(1, 2, 1))
-})
+  rbind(integrated, gerund, different)
+}
 
-test_that("lo mismo is action-proform evidence, not an instruction to consume its noun", {
-  tokens <- contract_clause(
+same_tokens <- function() {
+  contract_clause(
     "same", c("hizo", "lo", "mismo"), c("hacer", "\u00e9l", "mismo"),
     c("VERB", "PRON", "NOUN"), c(0, 3, 1), c("root", "det", "obj"),
     c("VerbForm=Fin", NA, NA)
   )
-  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
+}
+
+# The duplicate fixture is a separate document in the batch, so it gets its
+# own doc_id (counts are per document).
+duplicate_same_tokens <- function() {
+  duplicate <- rbind(same_tokens(), contract_clause("same", "lo", "\u00e9l", "PRON", 1, "obj"))
+  duplicate$token_id[4] <- "4"
+  duplicate$doc_id <- "same_duplicate"
+  duplicate
+}
+
+# Pipeline calls have a large fixed cost: the independent UDPipe-schema
+# fixtures above run as one corpus (one raw call, one audit call); counts and
+# audit rows are per document, so each test reads its own documents.
+proverb_batch <- local({
+  cache <- NULL
+  function() {
+    if (is.null(cache)) {
+      tokens <- rbind(excluded_proverb_tokens(), enclitic_tokens(), same_tokens(),
+                      duplicate_same_tokens())
+      cache <<- list(raw = biber_fixture(tokens, measure = "none", normalize = FALSE),
+                     audit = audit_fixture(tokens, feature = "f_12_proverb_do"))
+    }
+    cache
+  }
+})
+
+# Rows of a batched result for the documents of `tokens`, in result order.
+proverb_rows <- function(tokens) {
+  raw <- proverb_batch()$raw
+  raw <- raw[raw$doc_id %in% tokens$doc_id, , drop = FALSE]
+  rownames(raw) <- NULL
+  raw
+}
+
+proverb_audit <- function(tokens) {
+  audit <- proverb_batch()$audit
+  audit[audit$doc_id %in% tokens$doc_id, ]
+}
+
+test_that("f_12 counts the lexical predicate, preserving pronouns and word populations", {
+  fin <- "Person=3|Number=Sing|VerbForm=Fin"
+  tokens <- contract_clause(
+    "action", c("Lo", "hizo"), c("\u00e9l", "hacer"), c("PRON", "VERB"),
+    c(2, 0), c("obj", "root"), c("Case=Acc|Gender=Masc|PronType=Prs", fin)
+  )
+  spacy <- dplyr::rename(tokens, pos = "upos", tag = "xpos", morph = "feats")
+  class(spacy) <- c("spacyr_parsed", "data.frame")
+  original <- tokens
+  for (input in list(tokens, spacy)) {
+    raw <- biber_fixture(input, measure = "none", normalize = FALSE)
+    expect_equal(raw$f_12_proverb_do, 1)
+    expect_equal(raw$f_08_third_person_pronouns, 1)
+    expect_equal(word_tokens(input), 2)
+    expect_equal(biber_fixture(input, measure = "none")$f_12_proverb_do, 500)
+    expect_equal(audit_fixture(input, feature = "f_12_proverb_do")$keyword, "hizo")
+  }
+  expect_identical(tokens, original)
+})
+
+test_that("f_12 excludes auxiliary/copular, causative, reflexive and nominal-object hacer", {
+  raw <- proverb_rows(excluded_proverb_tokens())
+  expect_equal(raw$f_12_proverb_do, rep(0, 6))
+  expect_equal(raw$f_16_other_nouns[raw$doc_id == "nominal"], 1)
+})
+
+test_that("split and integrated enclitics recover only the approved hacer representation", {
+  tokens <- enclitic_tokens()
+  raw <- proverb_rows(tokens)
+  expect_equal(raw$f_12_proverb_do, c(1, 1, 0))
+  expect_equal(word_tokens(tokens), c(1, 2, 1))
+})
+
+test_that("lo mismo is action-proform evidence, not an instruction to consume its noun", {
+  tokens <- same_tokens()
+  raw <- proverb_rows(tokens)
   expect_equal(raw$f_12_proverb_do, 1)
   expect_equal(raw$f_14_nominalizations + raw$f_16_other_nouns, 1)
-  expect_equal(audit_fixture(tokens, feature = "f_12_proverb_do")$keyword, "hizo")
-  duplicate <- rbind(tokens, contract_clause("same", "lo", "\u00e9l", "PRON", 1, "obj"))
-  duplicate$token_id[4] <- "4"
-  expect_equal(biber_fixture(duplicate, measure = "none", normalize = FALSE)$f_12_proverb_do, 1)
+  expect_equal(proverb_audit(tokens)$keyword, "hizo")
+  duplicate <- duplicate_same_tokens()
+  expect_equal(proverb_rows(duplicate)$f_12_proverb_do, 1)
 })
 
 test_that("proverb links tolerate word-ID gaps and remain document/sentence-local", {

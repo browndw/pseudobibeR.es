@@ -8,7 +8,7 @@ aspect_clause <- function(doc_id, token, lemma, verbform, heads, relations,
   )
 }
 
-test_that("perfect aspect counts haber compounds, not progressive or modal chains", {
+perfect_aspect_clauses <- function() {
   clauses <- list(
     aspect_clause("active", c("ha", "revisado"), c("haber", "revisar"),
                   c("Fin", "Part"), c(2, 0), c("aux", "root")),
@@ -52,13 +52,108 @@ test_that("perfect aspect counts haber compounds, not progressive or modal chain
                   c(3, 3, 0), c("aux", "advmod", "root"), c("AUX", "ADV", "VERB"))
   )
   clauses[[6]]$feats[3] <- "VerbForm=Part|Voice=Pass"
+  clauses
+}
+
+tense_fixture <- function(i, feats) {
+  x <- contract_tokens(paste0("tense_", i))
+  x$feats[2] <- feats
+  x
+}
+
+tense_feats <- c(
+  "Mood=Ind|Tense=Past|VerbForm=Fin", "Mood=Ind|Tense=Imp|VerbForm=Fin",
+  "Mood=Sub|Tense=Imp|VerbForm=Fin", "Mood=Ind|Tense=Pqp|VerbForm=Fin",
+  "Mood=Ind|Tense=Pres|VerbForm=Fin", "Mood=Sub|Tense=Pres|VerbForm=Fin",
+  "Mood=Cnd|VerbForm=Fin", "Mood=Ind|Tense=Fut|VerbForm=Fin",
+  "Tense=Past|VerbForm=Part", "VerbForm=Inf", NA_character_
+)
+
+person_tokens <- function() {
+  data.frame(
+    doc_id = "persons", sentence_id = 1L, token_id = as.character(1:10),
+    token = c("yo", "mi", "mio", "usted", "vos", "tu", "ella", "su", "se", "el"),
+    lemma = c("yo", "mi", "m\u00edo", "t\u00fa", "t\u00fa", "tu", "\u00e9l",
+              "su", "\u00e9l", "el"),
+    upos = c("PRON", "DET", "NOUN", "PRON", "NOUN", "DET", "PRON", "DET",
+             "PRON", "DET"),
+    xpos = "X",
+    feats = c("Person=1|PronType=Prs", "Poss=Yes|Person=1", NA,
+              "Person=2|Polite=Form|PronType=Prs", NA, "Poss=Yes|Person=2",
+              "Person=3|PronType=Prs", "Poss=Yes|Person=3",
+              "Person=3|Reflex=Yes", "PronType=Art"),
+    head_token_id = "0", dep_rel = "dep"
+  )
+}
+
+indefinite_tokens <- function() {
+  data.frame(
+    doc_id = paste0("indefinite_", 1:6), sentence_id = 1L, token_id = "1",
+    token = c("uno", "un", "cualquiera", "todo", "todos", "alguien"),
+    lemma = c("uno", "uno", "cualquiera", "todo", "todo", "alguien"),
+    upos = c("PRON", "DET", "ADJ", "DET", "DET", "PRON"), xpos = "X",
+    feats = c("PronType=Ind", "PronType=Art", "PronType=Ind",
+              "PronType=Ind", "PronType=Ind", "PronType=Ind"),
+    head_token_id = "0", dep_rel = c("obj", "det", "amod", "det", "det:predet", "nsubj")
+  )
+}
+
+demonstrative_tokens <- function() {
+  data.frame(
+    doc_id = "demonstratives", sentence_id = 1L, token_id = as.character(1:3),
+    token = c("esto", "este", "este"), lemma = c("este", "este", "este"),
+    upos = c("PRON", "PRON", "DET"), xpos = "X", feats = "PronType=Dem",
+    head_token_id = "0", dep_rel = c("nsubj", "obj", "det")
+  )
+}
+
+# Pipeline calls have a large fixed cost: the independent UDPipe-schema
+# fixtures above run as one corpus (one raw call, one audit call); counts and
+# audit rows are per document, so each test reads its own documents.
+tense_batch <- local({
+  cache <- NULL
+  function() {
+    if (is.null(cache)) {
+      tokens <- rbind(
+        do.call(rbind, perfect_aspect_clauses()),
+        do.call(rbind, lapply(seq_along(tense_feats), function(i) {
+          tense_fixture(i, tense_feats[i])
+        })),
+        person_tokens(), indefinite_tokens(), demonstrative_tokens()
+      )
+      features <- c("f_02_perfect_aspect", "f_01_past_tense", "f_03_present_tense",
+                    "f_06_first_person_pronouns", "f_07_second_person_pronouns",
+                    "f_08_third_person_pronouns", "f_11_indefinite_pronouns",
+                    "f_10_demonstrative_pronoun")
+      cache <<- list(raw = biber_fixture(tokens, measure = "none", normalize = FALSE),
+                     audit = audit_fixture(tokens, feature = features))
+    }
+    cache
+  }
+})
+
+# Rows of a batched result for the documents of `tokens`, in result order.
+tense_rows <- function(tokens) {
+  raw <- tense_batch()$raw
+  raw <- raw[raw$doc_id %in% tokens$doc_id, , drop = FALSE]
+  rownames(raw) <- NULL
+  raw
+}
+
+tense_audit <- function(tokens, feature) {
+  audit <- tense_batch()$audit
+  audit[audit$doc_id %in% tokens$doc_id & audit$feature == feature, ]
+}
+
+test_that("perfect aspect counts haber compounds, not progressive or modal chains", {
+  clauses <- perfect_aspect_clauses()
   tokens <- do.call(rbind, clauses)
-  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
+  raw <- tense_rows(tokens)
   expected <- c(1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1)
   expect_equal(raw$doc_id, vapply(clauses, function(x) x$doc_id[1], character(1)))
   expect_equal(raw$f_02_perfect_aspect, expected)
 
-  audit <- audit_fixture(tokens, feature = "f_02_perfect_aspect")
+  audit <- tense_audit(tokens, "f_02_perfect_aspect")
   expect_equal(tabulate(match(audit$doc_id, raw$doc_id), nbins = nrow(raw)), expected)
   expect_equal(audit$keyword, ifelse(audit$doc_id == "nested_modal", "haber", "ha"))
   expect_equal(biber_fixture(tokens, measure = "none")$f_02_perfect_aspect,
@@ -82,82 +177,48 @@ test_that("perfect complements stay within their sentence and document", {
 })
 
 test_that("finite past and present rules count every mood but exclude nonfinite forms", {
-  feats <- c(
-    "Mood=Ind|Tense=Past|VerbForm=Fin", "Mood=Ind|Tense=Imp|VerbForm=Fin",
-    "Mood=Sub|Tense=Imp|VerbForm=Fin", "Mood=Ind|Tense=Pqp|VerbForm=Fin",
-    "Mood=Ind|Tense=Pres|VerbForm=Fin", "Mood=Sub|Tense=Pres|VerbForm=Fin",
-    "Mood=Cnd|VerbForm=Fin", "Mood=Ind|Tense=Fut|VerbForm=Fin",
-    "Tense=Past|VerbForm=Part", "VerbForm=Inf", NA_character_
-  )
+  feats <- tense_feats
   tokens <- do.call(rbind, lapply(seq_along(feats), function(i) {
-    x <- contract_tokens(paste0("tense_", i))
-    x$feats[2] <- feats[i]
-    x
+    tense_fixture(i, feats[i])
   }))
-  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
+  raw <- tense_rows(tokens)
   expect_equal(raw$f_01_past_tense, c(rep(1, 4), rep(0, 7)))
   # The present subjunctive counts in f_03, as the imperfect subjunctive does in f_01.
   expect_equal(raw$f_03_present_tense, c(rep(0, 4), 1, 1, rep(0, 5)))
   for (feature in c("f_01_past_tense", "f_03_present_tense")) {
-    audit <- audit_fixture(tokens, feature = feature)
+    audit <- tense_audit(tokens, feature)
     expect_equal(tabulate(match(audit$doc_id, raw$doc_id), nbins = nrow(raw)),
                  raw[[feature]])
   }
 })
 
 test_that("personal pronouns and possessives retain the documented person routing", {
-  tokens <- data.frame(
-    doc_id = "persons", sentence_id = 1L, token_id = as.character(1:10),
-    token = c("yo", "mi", "mio", "usted", "vos", "tu", "ella", "su", "se", "el"),
-    lemma = c("yo", "mi", "m\u00edo", "t\u00fa", "t\u00fa", "tu", "\u00e9l",
-              "su", "\u00e9l", "el"),
-    upos = c("PRON", "DET", "NOUN", "PRON", "NOUN", "DET", "PRON", "DET",
-             "PRON", "DET"),
-    xpos = "X",
-    feats = c("Person=1|PronType=Prs", "Poss=Yes|Person=1", NA,
-              "Person=2|Polite=Form|PronType=Prs", NA, "Poss=Yes|Person=2",
-              "Person=3|PronType=Prs", "Poss=Yes|Person=3",
-              "Person=3|Reflex=Yes", "PronType=Art"),
-    head_token_id = "0", dep_rel = "dep"
-  )
-  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
+  tokens <- person_tokens()
+  raw <- tense_rows(tokens)
   features <- c("f_06_first_person_pronouns", "f_07_second_person_pronouns",
                 "f_08_third_person_pronouns")
   expect_equal(as.numeric(raw[1, features]), c(3, 3, 2))
   for (feature in features) {
-    audit <- audit_fixture(tokens, feature = feature)
+    audit <- tense_audit(tokens, feature)
     expect_equal(sum(audit$count), raw[[feature]])
   }
   expect_equal(raw$f_09_pronoun_it, 0)
 })
 
 test_that("indefinite pronouns exclude articles, adjectives, and determiner subtypes", {
-  tokens <- data.frame(
-    doc_id = paste0("indefinite_", 1:6), sentence_id = 1L, token_id = "1",
-    token = c("uno", "un", "cualquiera", "todo", "todos", "alguien"),
-    lemma = c("uno", "uno", "cualquiera", "todo", "todo", "alguien"),
-    upos = c("PRON", "DET", "ADJ", "DET", "DET", "PRON"), xpos = "X",
-    feats = c("PronType=Ind", "PronType=Art", "PronType=Ind",
-              "PronType=Ind", "PronType=Ind", "PronType=Ind"),
-    head_token_id = "0", dep_rel = c("obj", "det", "amod", "det", "det:predet", "nsubj")
-  )
-  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
+  tokens <- indefinite_tokens()
+  raw <- tense_rows(tokens)
   expect_equal(raw$f_11_indefinite_pronouns, c(1, 0, 0, 0, 0, 1))
-  audit <- audit_fixture(tokens, feature = "f_11_indefinite_pronouns")
+  audit <- tense_audit(tokens, "f_11_indefinite_pronouns")
   expect_equal(audit$keyword, c("uno", "alguien"))
 })
 
 test_that("demonstrative pronouns do not count as demonstrative determiners", {
-  tokens <- data.frame(
-    doc_id = "demonstratives", sentence_id = 1L, token_id = as.character(1:3),
-    token = c("esto", "este", "este"), lemma = c("este", "este", "este"),
-    upos = c("PRON", "PRON", "DET"), xpos = "X", feats = "PronType=Dem",
-    head_token_id = "0", dep_rel = c("nsubj", "obj", "det")
-  )
-  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
+  tokens <- demonstrative_tokens()
+  raw <- tense_rows(tokens)
   expect_equal(raw$f_10_demonstrative_pronoun, 2)
   expect_equal(raw$f_51_demonstratives, 1)
-  expect_equal(sum(audit_fixture(tokens, feature = "f_10_demonstrative_pronoun")$count), 2)
+  expect_equal(sum(tense_audit(tokens, "f_10_demonstrative_pronoun")$count), 2)
 })
 
 test_that("Spanish-GSD preserves the validated aspect contrasts", {

@@ -51,14 +51,17 @@ test_that("prepositions must introduce the infinitive, directly or through an in
   wrong$doc_id <- "wrong_link"
   wrong$head_token_id[2] <- "0"
   tokens <- rbind(direct, indirect, wrong)
-  expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_62_split_infinitive,
-               c(1, 1, 0))
   chain <- interrupted_infinitive("chain", c("muy", "lentamente"))
   chain$head_token_id[1:3] <- c("2", "3", "4")
   chain$dep_rel[1] <- "case"
-  expect_equal(biber_fixture(chain, measure = "none", normalize = FALSE)$f_62_split_infinitive, 1)
-  chain$head_token_id[2] <- "2"
-  expect_equal(biber_fixture(chain, measure = "none", normalize = FALSE)$f_62_split_infinitive, 0)
+  broken <- chain
+  broken$doc_id <- "broken_chain"
+  broken$head_token_id[2] <- "2"
+  # Independent documents, one call.
+  raw <- biber_fixture(rbind(tokens, chain, broken), measure = "none", normalize = FALSE)
+  expect_equal(raw$f_62_split_infinitive[1:3], c(1, 1, 0))
+  expect_equal(raw$f_62_split_infinitive[raw$doc_id == "chain"], 1)
+  expect_equal(raw$f_62_split_infinitive[raw$doc_id == "broken_chain"], 0)
 })
 
 test_that("compound/copular infinitives and fixed introductory markers retain full matched spans", {

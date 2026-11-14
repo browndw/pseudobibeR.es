@@ -156,11 +156,13 @@ test_that("resumption counts constructions, not repeated pronouns, and respects 
       "PronType=Prs|Person=3|Gender=Masc|Number=Sing")
   )
   expect_equal(biber_fixture(repeated, measure = "none", normalize = FALSE)$f_61_stranded_preposition, 1)
-  expect_equal(nrow(audit_fixture(repeated, feature = "f_61_stranded_preposition")), 1L)
   tokens <- resumptive_clause("ids")
   tokens$token_id <- c("10", "20", "40", "60", "80")
   tokens$head_token_id <- c("0", "40", "10", "80", "40")
-  expect_equal(audit_fixture(tokens, feature = "f_61_stranded_preposition")$keyword, "de \u00e9l")
+  # One audit of both independent documents.
+  audit <- audit_fixture(rbind(repeated, tokens), feature = "f_61_stranded_preposition")
+  expect_equal(nrow(audit[audit$doc_id == "repeated", ]), 1L)
+  expect_equal(audit$keyword[audit$doc_id == "ids"], "de \u00e9l")
   tokens$sentence_id[4:5] <- 2L
   expect_equal(biber_fixture(tokens, measure = "none", normalize = FALSE)$f_61_stranded_preposition, 0)
   tokens$sentence_id <- 1L

@@ -79,24 +79,27 @@ test_that("frozen native Spanish spaCy annotations support extraction and auditi
 test_that("Spanish spaCy model errors are not silently rewritten", {
   fixture <- readRDS(test_path("fixtures", "spanish-spacy-regressions.rds"))
   tokens <- fixture$tokens
-  raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
-  expect_equal(raw$f_63_split_auxiliary[raw$doc_id == "split_misparse"], 0)
-  expect_equal(raw$f_52_modal_possibility[raw$doc_id == "split_misparse"], 0)
-  expect_equal(raw$f_65_clausal_coordination[raw$doc_id == "coordination_misparse"], 0)
-  expect_equal(raw$f_23_wh_clause[raw$doc_id == "wh_misparse"], 0)
   split <- tokens[tokens$doc_id == "split_misparse", ]
   expect_equal(split$head_token_id[split$token == "Puede"], 2)
   split$head_token_id[split$token == "Puede"] <- 3
-  expect_equal(biber_fixture(split, measure = "none", normalize = FALSE)$f_63_split_auxiliary, 1)
-  expect_equal(biber_fixture(split, measure = "none", normalize = FALSE)$f_52_modal_possibility, 1)
+  split$doc_id <- "split_repaired"
   clitic <- tokens[tokens$doc_id == "tokens", ]
   expect_equal(clitic$lemma[clitic$token == "verlo"], "ver \u00e9l")
-  expect_equal(raw$f_56_verb_private[raw$doc_id == "tokens"], 0)
   indirect <- tokens[tokens$doc_id == "wh_misparse", ]
   expect_equal(indirect$pos[indirect$token == "d\u00f3nde"], "PRON")
   expect_equal(indirect$morph[indirect$token == "d\u00f3nde"], "PronType=Ind")
   indirect$pos[indirect$token == "d\u00f3nde"] <- "ADV"
-  expect_equal(biber_fixture(indirect, measure = "none", normalize = FALSE)$f_23_wh_clause, 1)
+  indirect$doc_id <- "wh_repaired"
+  # One call: the original documents plus the two repaired copies.
+  raw <- biber_fixture(rbind(tokens, split, indirect), measure = "none", normalize = FALSE)
+  expect_equal(raw$f_63_split_auxiliary[raw$doc_id == "split_misparse"], 0)
+  expect_equal(raw$f_52_modal_possibility[raw$doc_id == "split_misparse"], 0)
+  expect_equal(raw$f_65_clausal_coordination[raw$doc_id == "coordination_misparse"], 0)
+  expect_equal(raw$f_23_wh_clause[raw$doc_id == "wh_misparse"], 0)
+  expect_equal(raw$f_63_split_auxiliary[raw$doc_id == "split_repaired"], 1)
+  expect_equal(raw$f_52_modal_possibility[raw$doc_id == "split_repaired"], 1)
+  expect_equal(raw$f_56_verb_private[raw$doc_id == "tokens"], 0)
+  expect_equal(raw$f_23_wh_clause[raw$doc_id == "wh_repaired"], 1)
 })
 
 test_that("spaCy passive conventions stay restricted to ser and nominal por-agents", {
@@ -110,25 +113,31 @@ test_that("spaCy passive conventions stay restricted to ser and nominal por-agen
   other_predicate$head_token_id[other_predicate$token == "equipo"] <- 2
   verbal <- agent
   verbal$pos[verbal$token == "equipo"] <- "VERB"
-  for (tokens in list(missing_por, nominal_modifier, other_predicate, verbal)) {
-    raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
-    expect_equal(raw$f_17_agentless_passives, 1)
-    expect_equal(raw$f_18_by_passives, 0)
-  }
   progressive <- fixture$tokens[fixture$tokens$doc_id == "progressive", ]
   stative <- agent
   stative$lemma[stative$token == "fue"] <- "estar"
-  for (tokens in list(progressive, stative)) {
-    raw <- biber_fixture(tokens, measure = "none", normalize = FALSE)
-    expect_equal(raw$f_17_agentless_passives + raw$f_18_by_passives, 0)
+  raw <- biber_docs(list(
+    missing_por = missing_por, nominal_modifier = nominal_modifier,
+    other_predicate = other_predicate, verbal = verbal,
+    progressive = progressive, stative = stative
+  ), measure = "none", normalize = FALSE)
+  for (id in c("missing_por", "nominal_modifier", "other_predicate", "verbal")) {
+    expect_equal(raw$f_17_agentless_passives[raw$doc_id == id], 1)
+    expect_equal(raw$f_18_by_passives[raw$doc_id == id], 0)
+  }
+  for (id in c("progressive", "stative")) {
+    expect_equal(raw$f_17_agentless_passives[raw$doc_id == id] +
+                   raw$f_18_by_passives[raw$doc_id == id], 0)
   }
   ud <- dplyr::rename(agent, upos = "pos", xpos = "tag", feats = "morph")
   class(ud) <- "data.frame"
-  expect_equal(biber_fixture(ud, measure = "none", normalize = FALSE)$f_18_by_passives, 0)
-  ud$dep_rel[ud$token == "fue"] <- "aux:pass"
-  raw_ud <- biber_fixture(ud, measure = "none", normalize = FALSE)
-  expect_equal(raw_ud$f_17_agentless_passives, 1)
-  expect_equal(raw_ud$f_18_by_passives, 0)
+  ud_aux_pass <- ud
+  ud_aux_pass$dep_rel[ud_aux_pass$token == "fue"] <- "aux:pass"
+  raw_ud <- biber_docs(list(ud = ud, ud_aux_pass = ud_aux_pass),
+                       measure = "none", normalize = FALSE)
+  expect_equal(raw_ud$f_18_by_passives[1], 0)
+  expect_equal(raw_ud$f_17_agentless_passives[2], 1)
+  expect_equal(raw_ud$f_18_by_passives[2], 0)
 })
 
 test_that("live Spanish spaCy morphology passes through spacyr into the common pipeline", {

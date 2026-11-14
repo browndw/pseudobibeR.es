@@ -23,9 +23,11 @@ test_that("que complement clauses do not absorb purpose or conditional clauses",
   expect_equal(raw$f_22_that_adj_comp, c(0, 0, 0, 1))
   expect_equal(raw$f_37_if, c(0, 0, 1, 0))
   expect_equal(raw$f_38_other_adv_sub, c(0, 1, 0, 0))
-  for (feature in c("f_21_that_verb_comp", "f_22_that_adj_comp", "f_37_if",
-                    "f_38_other_adv_sub")) {
-    audit <- audit_fixture(tokens, feature = feature)
+  features <- c("f_21_that_verb_comp", "f_22_that_adj_comp", "f_37_if",
+                "f_38_other_adv_sub")
+  audits <- audit_by_feature(tokens, features)
+  for (feature in features) {
+    audit <- audits[[feature]]
     expect_equal(tabulate(match(audit$doc_id, raw$doc_id), nbins = nrow(raw)),
                  raw[[feature]])
   }

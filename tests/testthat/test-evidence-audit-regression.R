@@ -17,13 +17,15 @@
 
 library(testthat)
 
-# Locate model (relative or in package root)
-ud_model <- .fc_ud_or_null()
-
-trace_text <- function(text, doc_id = "t1") {
-  parsed <- udpipe::udpipe_annotate(ud_model, x = text, doc_id = doc_id)
-  pseudobibeR.es:::biber_es_traced(parsed, measure = "none", normalize = FALSE)
-}
+# All parsed sentences are traced in a single batch.
+audit <- ud_batch(c(
+  "Yo creo que nosotros podemos mejorar.",
+  "No sé quién llamó ni cuándo llegó.",
+  "El equipo que fue asignado al proyecto comenzó ayer.",
+  "Se debe seguir el procedimiento.",
+  "Quizás el resultado depende de otros factores.",
+  "Quizás y tal vez los resultados son válidos."
+))
 
 # ---------------------------------------------------------------------------
 # f_06_first_person_pronouns -- audit commit bcbf08c
@@ -36,12 +38,7 @@ trace_text <- function(text, doc_id = "t1") {
 # ---------------------------------------------------------------------------
 
 test_that("f_06: la evidencia contiene yo y nosotros, no los verbos conjugados", {
-  skip_if(is.null(ud_model), "modelo UDPipe no disponible")
-  skip_if_not(exists("biber_es_traced", envir = asNamespace("pseudobibeR.es")),
-              "biber_es_traced() requerida")
-
-  result <- trace_text("Yo creo que nosotros podemos mejorar.")
-  ev_f06 <- result$evidence[result$evidence$feature == "f_06_first_person_pronouns", ]
+  ev_f06 <- audit$evidence("Yo creo que nosotros podemos mejorar.", "f_06_first_person_pronouns")
 
   expect_gte(nrow(ev_f06), 2L)
   tokens_lower <- tolower(ev_f06$token)
@@ -63,12 +60,7 @@ test_that("f_06: la evidencia contiene yo y nosotros, no los verbos conjugados",
 # ---------------------------------------------------------------------------
 
 test_that("f_23: la evidencia contiene quien y cuando (acentuados, no relativos)", {
-  skip_if(is.null(ud_model), "modelo UDPipe no disponible")
-  skip_if_not(exists("biber_es_traced", envir = asNamespace("pseudobibeR.es")),
-              "biber_es_traced() requerida")
-
-  result <- trace_text("No sé quién llamó ni cuándo llegó.")
-  ev_f23 <- result$evidence[result$evidence$feature == "f_23_wh_clause", ]
+  ev_f23 <- audit$evidence("No sé quién llamó ni cuándo llegó.", "f_23_wh_clause")
 
   expect_gte(nrow(ev_f23), 2L)
   tokens_lower <- tolower(ev_f23$token)
@@ -77,12 +69,7 @@ test_that("f_23: la evidencia contiene quien y cuando (acentuados, no relativos)
 })
 
 test_that("f_23: 'que' relativo (sin tilde) NO aparece en la evidencia", {
-  skip_if(is.null(ud_model), "modelo UDPipe no disponible")
-  skip_if_not(exists("biber_es_traced", envir = asNamespace("pseudobibeR.es")),
-              "biber_es_traced() requerida")
-
-  result <- trace_text("El equipo que fue asignado al proyecto comenzó ayer.")
-  ev_f23 <- result$evidence[result$evidence$feature == "f_23_wh_clause", ]
+  ev_f23 <- audit$evidence("El equipo que fue asignado al proyecto comenzó ayer.", "f_23_wh_clause")
 
   expect_equal(nrow(ev_f23), 0L,
                info = "evidencia f_23 contiene tokens cuando deberia estar vacia")
@@ -110,12 +97,7 @@ test_that("f_24 evidence includes infinitive auxiliaries but not finite quiero",
 })
 
 test_that("f_24: 'Se debe seguir' SI cuenta seguir (root|Inf con AUX|Fin hijo)", {
-  skip_if(is.null(ud_model), "modelo UDPipe no disponible")
-  skip_if_not(exists("biber_es_traced", envir = asNamespace("pseudobibeR.es")),
-              "biber_es_traced() requerida")
-
-  result <- trace_text("Se debe seguir el procedimiento.")
-  ev_f24 <- result$evidence[result$evidence$feature == "f_24_infinitives", ]
+  ev_f24 <- audit$evidence("Se debe seguir el procedimiento.", "f_24_infinitives")
 
   expect_gte(nrow(ev_f24), 1L)
   expect_true("seguir" %in% tolower(ev_f24$token),
@@ -135,20 +117,10 @@ test_that("f_24: 'Se debe seguir' SI cuenta seguir (root|Inf con AUX|Fin hijo)",
 # ---------------------------------------------------------------------------
 
 test_that("f_47: quizas se detecta correctamente (locale UTF-8 forzado)", {
-  skip_if(is.null(ud_model), "modelo UDPipe no disponible")
-  skip_if_not(exists("biber_es_traced", envir = asNamespace("pseudobibeR.es")),
-              "biber_es_traced() requerida")
-
-  result <- trace_text("Quizás el resultado depende de otros factores.")
-  expect_gte(result$counts$f_47_hedges[[1]], 1L,
+  expect_gte(audit$count("Quizás el resultado depende de otros factores.", "f_47_hedges"), 1L,
              label = "f_47 count en 'Quizas el resultado depende'")
 })
 
 test_that("f_47: tambien funciona con multiples hedges acentuados", {
-  skip_if(is.null(ud_model), "modelo UDPipe no disponible")
-  skip_if_not(exists("biber_es_traced", envir = asNamespace("pseudobibeR.es")),
-              "biber_es_traced() requerida")
-
-  result <- trace_text("Quizás y tal vez los resultados son válidos.")
-  expect_gte(result$counts$f_47_hedges[[1]], 1L)
+  expect_gte(audit$count("Quizás y tal vez los resultados son válidos.", "f_47_hedges"), 1L)
 })

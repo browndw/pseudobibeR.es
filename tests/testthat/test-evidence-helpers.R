@@ -213,6 +213,23 @@ test_that("count_feature_traced() satisface count == nrow(evidence) (invariante 
   }
 })
 
+test_that("count_feature_traced() keeps the first row per token key in sorted documents", {
+  tbl <- tibble::tibble(
+    doc_id            = c("d2", "d1", "d2", "d1", "d1"),
+    sentence_id       = c(1L, 1L, 1L, 2L, 1L),
+    token_id_int      = c(3L, 2L, 3L, 2L, 2L),
+    token             = c("first", "a", "second", "b", "c"),
+    lemma             = "x",
+    pos               = "VERB",
+    feats             = NA_character_,
+    head_token_id_int = 0L
+  )
+  br <- count_traced(tbl, "f_01_past_tense")
+  expect_equal(br$counts$doc_id, c("d1", "d2"))
+  expect_equal(br$counts$f_01_past_tense, c(2L, 1L))
+  expect_equal(br$evidence$token, c("first", "a", "b"))
+})
+
 test_that("count_feature_traced() maneja tbl vacio sin error", {
   tbl <- tibble::tibble(
     doc_id            = character(0),
