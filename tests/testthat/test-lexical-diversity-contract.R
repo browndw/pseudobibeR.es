@@ -71,6 +71,18 @@ test_that("the MATTR fallback threshold is strictly below 200 diversity tokens",
   expect_equal(with_numbers$f_43_type_token, 2 / 199)
 })
 
+test_that("internal MATTR matches quanteda.textstats, including re-split tokens", {
+  set.seed(43)
+  vocab <- c(paste0("w", 1:60, "_noun"), "etc._x", "-según_adp", "31/mzo_adj",
+             "y/o_adj", "presente-_x", "zacatecas—_propn", "sr._propn")
+  docs <- quanteda::as.tokens(list(
+    a = sample(vocab, 260, replace = TRUE),
+    b = sample(vocab[1:20], 230, replace = TRUE)
+  ))
+  expected <- quanteda.textstats::textstat_lexdiv(docs, measure = "MATTR")$MATTR
+  expect_equal(mattr_lexdiv(docs), expected, tolerance = 1e-12)
+})
+
 test_that("explicit TTR and CTTR are retained across mixed document lengths", {
   tokens <- rbind(
     diversity_tokens("long", c(rep("libro", 120), rep("texto", 120))),

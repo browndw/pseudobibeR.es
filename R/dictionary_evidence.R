@@ -26,18 +26,19 @@ surface_matches <- function(tokens, patterns) {
     valuetype = "glob", case_insensitive = TRUE, window = 0
   )
   if (!nrow(matches)) return(empty)
+  flat_rows <- unlist(rows, use.names = FALSE)
+  offsets <- c(0L, cumsum(lengths(rows)))[match(as.character(matches$docname), names(rows))]
   found <- unique(data.frame(
-    start_row = vapply(seq_len(nrow(matches)), function(i) {
-      rows[[as.character(matches$docname[i])]][matches$from[i]]
-    }, integer(1)),
-    end_row = vapply(seq_len(nrow(matches)), function(i) {
-      rows[[as.character(matches$docname[i])]][matches$to[i]]
-    }, integer(1))
+    start_row = flat_rows[offsets + matches$from],
+    end_row = flat_rows[offsets + matches$to]
   ))
-  keep <- vapply(seq_len(nrow(found)), function(i) {
-    !any(found$start_row <= found$start_row[i] & found$end_row >= found$end_row[i] &
-           (found$start_row < found$start_row[i] | found$end_row > found$end_row[i]))
-  }, logical(1))
+  # A span is dropped when another (distinct) span contains it. After ordering
+  # by start ascending and end descending, every earlier span starts no later,
+  # so containment reduces to a running maximum of earlier ends.
+  ord <- order(found$start_row, -found$end_row)
+  prior_max_end <- c(-Inf, cummax(found$end_row[ord])[-length(ord)])
+  keep <- logical(nrow(found))
+  keep[ord] <- prior_max_end < found$end_row[ord]
   found[keep, , drop = FALSE]
 }
 
@@ -49,9 +50,12 @@ dictionary_evidence <- function(tokens, features) {
     hits <- surface_matches(tokens, dict[[feature]])
     if (!nrow(hits)) next
     rows <- tokens[hits$start_row, ]
-    rows$token <- vapply(seq_len(nrow(hits)), function(i) {
-      paste(tokens$token[seq.int(hits$start_row[i], hits$end_row[i])], collapse = " ")
-    }, character(1))
+    widths <- hits$end_row - hits$start_row + 1L
+    hit_index <- rep(seq_len(nrow(hits)), widths)
+    rows$token <- vapply(
+      split(tokens$token[hits$start_row[hit_index] + sequence(widths) - 1L], hit_index),
+      paste, character(1), collapse = " "
+    )
     evidence[[feature]] <- evidence_from_rows(rows, feature)
     spans[[feature]] <- data.frame(
       feature = feature, doc_id = rows$doc_id, sentence_id = rows$sentence_id,

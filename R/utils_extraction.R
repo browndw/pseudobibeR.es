@@ -37,13 +37,9 @@ replace_nas <- function(x) {
 #' @return Character vector of extracted values
 #' @keywords internal
 extract_morph_value <- function(feats, key) {
-  purrr::map_chr(feats, function(f) {
-    if (is.na(f) || f == "") return(NA_character_)
-    parts <- stringr::str_split(f, "\\|")[[1]]
-    match <- parts[stringr::str_detect(parts, paste0("^", key, "="))]
-    if (length(match) == 0) return(NA_character_)
-    stringr::str_remove(match[1], paste0("^", key, "="))
-  })
+  stringi::stri_match_first_regex(
+    as.character(feats), paste0("(?:^|\\|)\\Q", key, "\\E=([^|]*)")
+  )[, 2L]
 }
 
 #' Get a named word list from the word_lists data
@@ -101,28 +97,28 @@ flag_mwe_tokens <- function(tokens, multiword_patterns) {
   tok_lc   <- stringr::str_to_lower(tokens$token)
   doc_sent <- paste(tokens$doc_id, tokens$sentence_id, sep = "\x1f")
   N <- nrow(tokens)
+  # same_unit[i]: token i and token i + 1 share a document and sentence.
+  same_unit <- c(doc_sent[-N] == doc_sent[-1L], FALSE)
+  in_mwe <- tokens$in_mwe
 
   for (k in seq_along(patterns)) {
     words <- pattern_words[[k]]
     n <- length(words)
     if (n > N) next
 
-    starts <- seq_len(N - n + 1L)
-    match  <- tok_lc[starts] == words[1L]
+    starts <- which(tok_lc == words[1L])
+    starts <- starts[starts <= N - n + 1L]
     if (n > 1L) {
       for (j in 2:n) {
-        match <- match &
-          tok_lc[starts + (j - 1L)] == words[j] &
-          doc_sent[starts] == doc_sent[starts + (j - 1L)]
+        starts <- starts[which(tok_lc[starts + (j - 1L)] == words[j] &
+                                 same_unit[starts + (j - 2L)])]
       }
     }
 
-    hits <- starts[which(match)]
-    if (length(hits) == 0) next
-    for (s in hits) {
-      tokens$in_mwe[s:(s + n - 1L)] <- TRUE
-    }
+    if (length(starts) == 0) next
+    in_mwe[rep(starts, each = n) + rep.int(seq_len(n) - 1L, length(starts))] <- TRUE
   }
+  tokens$in_mwe <- in_mwe
   tokens
 }
 

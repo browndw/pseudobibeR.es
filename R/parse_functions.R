@@ -88,15 +88,17 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
 
   lexical <- dictionary_evidence(tokens, c(.dual_path_features, .dict_only_features))
   lexical$evidence <- clause_initial_particles(lexical$evidence, tokens)
-  for (feature in .dual_path_features) {
-    spans <- lexical$spans[lexical$spans$feature == feature, ]
-    for (i in seq_len(nrow(spans))) {
-      covered <- evidence$feature == feature &
-        evidence$doc_id == spans$doc_id[i] &
-        evidence$sentence_id == spans$sentence_id[i] &
-        evidence$token_id >= spans$start[i] & evidence$token_id <= spans$end[i]
-      evidence <- evidence[!covered, ]
-    }
+  spans <- lexical$spans[lexical$spans$feature %in% .dual_path_features, ]
+  if (nrow(spans)) {
+    widths <- pmax(spans$end - spans$start + 1L, 0L)
+    span_rows <- rep(seq_len(nrow(spans)), widths)
+    offsets <- sequence(widths) - 1L
+    covered_keys <- paste(spans$feature[span_rows], spans$doc_id[span_rows],
+                          spans$sentence_id[span_rows],
+                          spans$start[span_rows] + offsets, sep = "\x1f")
+    evidence_keys <- paste(evidence$feature, evidence$doc_id,
+                           evidence$sentence_id, evidence$token_id, sep = "\x1f")
+    evidence <- evidence[!evidence_keys %in% covered_keys, ]
   }
   evidence <- bind_evidence(evidence, lexical$evidence)
   evidence <- dplyr::distinct(evidence, .data$doc_id, .data$feature,
@@ -138,12 +140,16 @@ parse_biber_features <- function(tokens, measure, normalize, engine = c("spacy",
     }
     counts$f_43_type_token <- rep(NA_real_, nrow(doc_ids))
     if (any(nonempty)) {
-      lexdiv <- quanteda.textstats::textstat_lexdiv(
-        document_tokens[nonempty], measure = actual
-      )
-      counts$f_43_type_token[nonempty] <- lexdiv[[actual]][
-        match(as.character(which(nonempty)), lexdiv$document)
-      ]
+      if (actual == "MATTR") {
+        counts$f_43_type_token[nonempty] <- mattr_lexdiv(document_tokens[nonempty])
+      } else {
+        lexdiv <- quanteda.textstats::textstat_lexdiv(
+          document_tokens[nonempty], measure = actual
+        )
+        counts$f_43_type_token[nonempty] <- lexdiv[[actual]][
+          match(as.character(which(nonempty)), lexdiv$document)
+        ]
+      }
     }
   }
   counts <- counts[, c("doc_id", intersect(names(.feature_categories), names(counts)))]

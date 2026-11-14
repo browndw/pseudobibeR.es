@@ -26,6 +26,15 @@
   Package builds exclude parser models and development outputs. Integration
   tests do not download models.
 
+## Performance
+
+- `biber()` and `audit_features()` run about five times faster on large corpora
+  (500 UDPipe documents: ~177 s to ~34 s) with identical results. Morphology
+  parsing, dictionary-span and prepositional-locution replacement, and
+  multiword flagging are vectorized. MATTR is computed with a linear sliding
+  window that reproduces `quanteda.textstats::textstat_lexdiv()` exactly,
+  including its re-tokenization of window text.
+
 ## Corrections that change results
 
 - f_50 counts discourse particles only at the start of a clause

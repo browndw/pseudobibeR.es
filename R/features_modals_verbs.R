@@ -152,15 +152,29 @@ block_adj_prep_adv_es <- function(tokens, doc_ids, dict_lookup, word_lists_looku
   # replaces the covered ADP occurrences. Expanded 'al'/'del' components are used.
   prep_locutions <- get_word_list(word_lists_lookup, "prepositions_compound")
   locutions <- surface_matches(tokens, prep_locutions)
-  for (i in seq_len(nrow(locutions))) {
-    rows <- tokens[seq.int(locutions$start_row[i], locutions$end_row[i]), ]
-    covered <- f39$evidence$doc_id == rows$doc_id[1L] &
-      f39$evidence$sentence_id == rows$sentence_id[1L] &
-      f39$evidence$token_id %in% rows$token_id_int
-    anchor <- rows[1L, ]
-    anchor$token <- paste(rows$token, collapse = " ")
+  if (nrow(locutions)) {
+    # Vectorized form of sequential replacement: each locution removes the f39
+    # rows it covers (including anchors of earlier locutions) and appends its
+    # own anchor, so an anchor survives only if no later locution covers it.
+    widths <- locutions$end_row - locutions$start_row + 1L
+    span_index <- rep(seq_len(nrow(locutions)), widths)
+    span_rows <- locutions$start_row[span_index] + sequence(widths) - 1L
+    row_key <- function(i) {
+      paste(tokens$doc_id[i], tokens$sentence_id[i], tokens$token_id_int[i], sep = "\x1f")
+    }
+    span_keys <- row_key(span_rows)
+    evidence_keys <- paste(f39$evidence$doc_id, f39$evidence$sentence_id,
+                           f39$evidence$token_id, sep = "\x1f")
+    anchor_rows <- locutions$start_row
+    by_last <- order(span_index, decreasing = TRUE)
+    last_cover <- span_index[by_last][match(row_key(anchor_rows), span_keys[by_last])]
+    keep_anchor <- last_cover <= seq_along(anchor_rows)
+    anchors <- tokens[anchor_rows[keep_anchor], ]
+    anchors$token <- vapply(split(tokens$token[span_rows], span_index),
+                            paste, character(1), collapse = " ")[keep_anchor]
     f39$evidence <- bind_evidence(
-      f39$evidence[!covered, ], evidence_from_rows(anchor, "f_39_prepositions")
+      f39$evidence[!evidence_keys %in% span_keys, ],
+      evidence_from_rows(anchors, "f_39_prepositions")
     )
   }
   f39$counts <- f39$evidence %>%
